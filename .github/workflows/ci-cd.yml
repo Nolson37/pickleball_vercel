@@ -1,0 +1,387 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [development, staging, main]
+  pull_request:
+    branches: [development, staging, main]
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./web
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: './web/package-lock.json'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run linting
+        run: npm run lint
+
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    needs: lint
+    defaults:
+      run:
+        working-directory: ./web
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: './web/package-lock.json'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run unit tests
+        run: npm test
+
+      - name: Run integration tests
+        run: npm run test:integration
+
+      - name: Run e2e tests
+        run: npm run test:e2e
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    needs: test
+    defaults:
+      run:
+        working-directory: ./web
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: './web/package-lock.json'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build application
+        run: npm run build
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: build-output
+          path: ./web/.next
+          retention-days: 1
+
+  database-migration:
+    name: Database Migration
+    runs-on: ubuntu-latest
+    needs: build
+    defaults:
+      run:
+        working-directory: ./web
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: './web/package-lock.json'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Create backup (Development)
+        if: github.ref == 'refs/heads/development'
+        run: |
+          echo "Creating database backup for development environment"
+          # This would be replaced with actual backup command
+          # Example: npx prisma db execute --file=./backup.sql --schema=./prisma/schema.prisma
+
+      - name: Create backup (Staging)
+        if: github.ref == 'refs/heads/staging'
+        run: |
+          echo "Creating database backup for staging environment"
+          # This would be replaced with actual backup command
+
+      - name: Create backup (Production)
+        if: github.ref == 'refs/heads/main'
+        run: |
+          echo "Creating database backup for production environment"
+          # This would be replaced with actual backup command
+          # For production, we would use a more robust backup solution
+
+      - name: Run migrations (Development)
+        if: github.ref == 'refs/heads/development'
+        run: npx prisma migrate deploy
+        env:
+          DATABASE_URL: ${{ secrets.DEV_DATABASE_URL }}
+
+      - name: Run migrations (Staging)
+        if: github.ref == 'refs/heads/staging'
+        run: npx prisma migrate deploy
+        env:
+          DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}
+
+      - name: Run migrations (Production)
+        if: github.ref == 'refs/heads/main'
+        run: |
+          # For production, we require manual approval before running migrations
+          echo "Migrations ready for manual approval"
+        env:
+          DATABASE_URL: ${{ secrets.PROD_DATABASE_URL }}
+
+  deploy-development:
+    name: Deploy to Development
+    runs-on: ubuntu-latest
+    needs: database-migration
+    if: github.ref == 'refs/heads/development'
+    environment: development
+    defaults:
+      run:
+        working-directory: ./web
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v3
+        with:
+          name: build-output
+          path: ./web/.next
+
+      - name: Deploy to Vercel (Development)
+        uses: amondnet/vercel-action@v20
+        with:
+          vercel-token: ${{ secrets.VERCEL_TOKEN }}
+          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
+          vercel-args: '--prod'
+          scope: ${{ secrets.VERCEL_ORG_ID }}
+          alias-domains: |
+            dev.pickleballplatform.com
+
+      - name: Run smoke tests
+        run: |
+          echo "Running smoke tests for development environment"
+          npx ts-node prod-tests/smoke/run-smoke-tests.ts
+        env:
+          PROD_TEST_BASE_URL: https://dev.pickleballplatform.com
+          PROD_TEST_USER_EMAIL: ${{ secrets.TEST_USER_EMAIL }}
+          PROD_TEST_USER_PASSWORD: ${{ secrets.TEST_USER_PASSWORD }}
+
+  deploy-staging:
+    name: Deploy to Staging
+    runs-on: ubuntu-latest
+    needs: database-migration
+    if: github.ref == 'refs/heads/staging'
+    environment: staging
+    defaults:
+      run:
+        working-directory: ./web
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v3
+        with:
+          name: build-output
+          path: ./web/.next
+
+      - name: Deploy to Vercel (Staging)
+        uses: amondnet/vercel-action@v20
+        with:
+          vercel-token: ${{ secrets.VERCEL_TOKEN }}
+          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
+          vercel-args: '--prod'
+          scope: ${{ secrets.VERCEL_ORG_ID }}
+          alias-domains: |
+            staging.pickleballplatform.com
+
+      - name: Run smoke tests
+        run: |
+          echo "Running smoke tests for staging environment"
+          npx ts-node prod-tests/smoke/run-smoke-tests.ts
+        env:
+          PROD_TEST_BASE_URL: https://staging.pickleballplatform.com
+          PROD_TEST_USER_EMAIL: ${{ secrets.TEST_USER_EMAIL }}
+          PROD_TEST_USER_PASSWORD: ${{ secrets.TEST_USER_PASSWORD }}
+
+      - name: Run load tests
+        run: |
+          echo "Running load tests for staging environment"
+          npx ts-node prod-tests/load/run-load-tests.ts
+        env:
+          PROD_TEST_BASE_URL: https://staging.pickleballplatform.com
+
+  deploy-production:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: database-migration
+    if: github.ref == 'refs/heads/main'
+    environment: production
+    defaults:
+      run:
+        working-directory: ./web
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v3
+        with:
+          name: build-output
+          path: ./web/.next
+
+      - name: Setup canary deployment
+        run: |
+          echo "Setting up canary deployment"
+          # This would be replaced with actual canary deployment setup
+          # Example: npx ts-node scripts/setup-canary.ts
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+
+      - name: Deploy to Vercel (Production - Canary)
+        uses: amondnet/vercel-action@v20
+        with:
+          vercel-token: ${{ secrets.VERCEL_TOKEN }}
+          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
+          vercel-args: '--prod'
+          scope: ${{ secrets.VERCEL_ORG_ID }}
+          alias-domains: |
+            canary.pickleballplatform.com
+
+      - name: Run smoke tests on canary
+        run: |
+          echo "Running smoke tests for canary deployment"
+          npx ts-node prod-tests/smoke/run-smoke-tests.ts
+        env:
+          PROD_TEST_BASE_URL: https://canary.pickleballplatform.com
+          PROD_TEST_USER_EMAIL: ${{ secrets.TEST_USER_EMAIL }}
+          PROD_TEST_USER_PASSWORD: ${{ secrets.TEST_USER_PASSWORD }}
+
+      - name: Gradually increase canary traffic
+        run: |
+          echo "Gradually increasing canary traffic"
+          # This would be replaced with actual traffic shifting
+          # Example: npx ts-node scripts/increase-canary-traffic.ts
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+
+      - name: Monitor canary health
+        run: |
+          echo "Monitoring canary health"
+          # This would be replaced with actual health monitoring
+          # Example: npx ts-node scripts/monitor-canary-health.ts
+        env:
+          PROD_TEST_BASE_URL: https://canary.pickleballplatform.com
+
+      - name: Deploy to Vercel (Production)
+        uses: amondnet/vercel-action@v20
+        with:
+          vercel-token: ${{ secrets.VERCEL_TOKEN }}
+          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
+          vercel-args: '--prod'
+          scope: ${{ secrets.VERCEL_ORG_ID }}
+          alias-domains: |
+            pickleballplatform.com
+
+      - name: Run smoke tests
+        run: |
+          echo "Running smoke tests for production environment"
+          npx ts-node prod-tests/smoke/run-smoke-tests.ts
+        env:
+          PROD_TEST_BASE_URL: https://pickleballplatform.com
+          PROD_TEST_USER_EMAIL: ${{ secrets.TEST_USER_EMAIL }}
+          PROD_TEST_USER_PASSWORD: ${{ secrets.TEST_USER_PASSWORD }}
+
+      - name: Setup monitoring
+        run: |
+          echo "Setting up monitoring for production environment"
+          # This would be replaced with actual monitoring setup
+          # Example: npx ts-node scripts/setup-monitoring.ts
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
+          SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
+
+  feature-flags:
+    name: Manage Feature Flags
+    runs-on: ubuntu-latest
+    needs: [deploy-development, deploy-staging, deploy-production]
+    if: always() && (needs.deploy-development.result == 'success' || needs.deploy-staging.result == 'success' || needs.deploy-production.result == 'success')
+    defaults:
+      run:
+        working-directory: ./web
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: './web/package-lock.json'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Update feature flags (Development)
+        if: github.ref == 'refs/heads/development' && needs.deploy-development.result == 'success'
+        run: |
+          echo "Updating feature flags for development environment"
+          # This would be replaced with actual feature flag update
+          # Example: npx ts-node scripts/update-feature-flags.ts --env=development
+        env:
+          API_URL: https://dev.pickleballplatform.com/api
+          API_TOKEN: ${{ secrets.DEV_API_TOKEN }}
+
+      - name: Update feature flags (Staging)
+        if: github.ref == 'refs/heads/staging' && needs.deploy-staging.result == 'success'
+        run: |
+          echo "Updating feature flags for staging environment"
+          # This would be replaced with actual feature flag update
+          # Example: npx ts-node scripts/update-feature-flags.ts --env=staging
+        env:
+          API_URL: https://staging.pickleballplatform.com/api
+          API_TOKEN: ${{ secrets.STAGING_API_TOKEN }}
+
+      - name: Update feature flags (Production)
+        if: github.ref == 'refs/heads/main' && needs.deploy-production.result == 'success'
+        run: |
+          echo "Updating feature flags for production environment"
+          # This would be replaced with actual feature flag update
+          # Example: npx ts-node scripts/update-feature-flags.ts --env=production
+        env:
+          API_URL: https://pickleballplatform.com/api
+          API_TOKEN: ${{ secrets.PROD_API_TOKEN }}
