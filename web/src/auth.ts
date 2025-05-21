@@ -19,7 +19,36 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     maxAge: 30 * 24 * 60 * 60, // 30 days by default
   },
   debug: process.env.NODE_ENV === 'development',
-  skipCSRFCheck: process.env.NODE_ENV === 'development', // Skip CSRF check in development
+  // Configure cookies for proper CSRF protection
+  cookies: {
+    sessionToken: {
+      name: `__Secure-next-auth.session-token`,
+      options: {
+        httpOnly: true,
+        sameSite: "lax",
+        path: "/",
+        secure: true
+      }
+    },
+    callbackUrl: {
+      name: `__Secure-next-auth.callback-url`,
+      options: {
+        httpOnly: true,
+        sameSite: "lax",
+        path: "/",
+        secure: true
+      }
+    },
+    csrfToken: {
+      name: `__Host-next-auth.csrf-token`,
+      options: {
+        httpOnly: true,
+        sameSite: "lax",
+        path: "/",
+        secure: true
+      }
+    }
+  },
   pages: {
     signIn: "/auth/signin",
     signOut: "/auth/signout",
