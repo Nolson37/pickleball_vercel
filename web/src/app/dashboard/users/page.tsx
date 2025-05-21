@@ -66,11 +66,19 @@ export default async function UsersPage() {
     const userWithOrganization = await prisma.user.findUnique({
       where: { id: user.id },
       include: {
-        organization: true,
+        organizations: {
+          include: {
+            organization: true,
+          }
+        },
       },
     })
     
-    organization = userWithOrganization?.organization
+    // Get the default organization or the first one if no default is set
+    const userOrg = userWithOrganization?.organizations.find(org => org.isDefault) ||
+                    userWithOrganization?.organizations[0]
+    
+    organization = userOrg?.organization
   }
   
   if (!organization) {

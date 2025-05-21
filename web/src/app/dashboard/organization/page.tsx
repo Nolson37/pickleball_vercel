@@ -70,11 +70,19 @@ export default async function OrganizationSettingsPage() {
     const userWithOrganization = await prisma.user.findUnique({
       where: { id: user.id },
       include: {
-        organization: true,
+        organizations: {
+          include: {
+            organization: true,
+          }
+        },
       },
     })
     
-    organization = userWithOrganization?.organization
+    // Get the default organization or the first one if no default is set
+    const userOrg = userWithOrganization?.organizations.find(org => org.isDefault) ||
+                    userWithOrganization?.organizations[0]
+    
+    organization = userOrg?.organization
   }
   
   if (!organization) {
@@ -126,20 +134,27 @@ export default async function OrganizationSettingsPage() {
     ];
   } else {
     // Get organization members from the database
-    organizationMembers = await prisma.user.findMany({
+    const userOrganizations = await prisma.userOrganization.findMany({
       where: {
         organizationId: organization.id,
       },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        role: true,
+      include: {
+        user: true,
       },
       orderBy: {
-        name: "asc",
+        user: {
+          name: "asc",
+        },
       },
-    }) as OrganizationMember[];
+    });
+    
+    // Map the results to the expected format
+    organizationMembers = userOrganizations.map(userOrg => ({
+      id: userOrg.user.id,
+      name: userOrg.user.name,
+      email: userOrg.user.email,
+      role: userOrg.roles.length > 0 ? userOrg.roles[0] : null, // Use the first role or null
+    }));
   }
   
   return (

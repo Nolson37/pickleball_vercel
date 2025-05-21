@@ -18,6 +18,7 @@ import {
   hasNumber,
   hasSpecialChar
 } from "@/lib/password-validation"
+import { Suspense } from "react"
 
 // Password validation schema
 const passwordSchema = z.string()
@@ -54,7 +55,8 @@ const resetPasswordSchema = z.object({
 
 type ResetPasswordFormValues = z.infer<typeof resetPasswordSchema>
 
-export default function ResetPasswordPage() {
+// Create a client component that uses useSearchParams
+function ResetPasswordForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const token = searchParams.get("token")
@@ -118,95 +120,110 @@ export default function ResetPasswordPage() {
   }
 
   return (
-    <div className="container flex items-center justify-center min-h-screen py-12">
-      <Card className="w-full max-w-md">
-        <CardHeader className="space-y-1">
-          <CardTitle className="text-2xl font-bold">Reset Password</CardTitle>
-          <CardDescription>
-            Enter your new password below
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {isSuccess ? (
-            <div className="p-4 bg-green-50 border border-green-200 text-green-700 rounded-md">
-              <p className="font-medium">Password Reset Successful!</p>
-              <p className="text-sm mt-1">
-                Your password has been reset successfully. You will be redirected to the sign in page shortly.
-              </p>
-            </div>
-          ) : (
-            <>
-              {error && (
-                <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-md text-sm">
-                  {error}
-                </div>
-              )}
-              
-              <Form {...form}>
-                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                  <FormField
-                    control={form.control}
-                    name="password"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>New Password</FormLabel>
-                        <FormControl>
-                          <Input
-                            type="password"
-                            placeholder="••••••••"
-                            {...field}
-                            disabled={isSubmitting}
-                          />
-                        </FormControl>
-                        <PasswordStrengthIndicator
-                          password={field.value}
-                          className="mt-2"
+    <Card className="w-full max-w-md">
+      <CardHeader className="space-y-1">
+        <CardTitle className="text-2xl font-bold">Reset Password</CardTitle>
+        <CardDescription>
+          Enter your new password below
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        {isSuccess ? (
+          <div className="p-4 bg-green-50 border border-green-200 text-green-700 rounded-md">
+            <p className="font-medium">Password Reset Successful!</p>
+            <p className="text-sm mt-1">
+              Your password has been reset successfully. You will be redirected to the sign in page shortly.
+            </p>
+          </div>
+        ) : (
+          <>
+            {error && (
+              <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-md text-sm">
+                {error}
+              </div>
+            )}
+            
+            <Form {...form}>
+              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                <FormField
+                  control={form.control}
+                  name="password"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>New Password</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="password"
+                          placeholder="••••••••"
+                          {...field}
+                          disabled={isSubmitting}
                         />
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  
-                  <FormField
-                    control={form.control}
-                    name="confirmPassword"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Confirm Password</FormLabel>
-                        <FormControl>
-                          <Input 
-                            type="password" 
-                            placeholder="••••••••" 
-                            {...field} 
-                            disabled={isSubmitting}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  
-                  <Button 
-                    type="submit" 
-                    className="w-full" 
-                    disabled={isSubmitting || !token}
-                  >
-                    {isSubmitting ? "Resetting..." : "Reset Password"}
-                  </Button>
-                </form>
-              </Form>
-            </>
-          )}
-        </CardContent>
-        <CardFooter className="flex justify-center">
-          <Link 
-            href="/auth/signin" 
-            className="text-sm text-primary hover:underline"
-          >
-            Back to Sign In
-          </Link>
-        </CardFooter>
-      </Card>
+                      </FormControl>
+                      <PasswordStrengthIndicator
+                        password={field.value}
+                        className="mt-2"
+                      />
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <FormField
+                  control={form.control}
+                  name="confirmPassword"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Confirm Password</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="password"
+                          placeholder="••••••••"
+                          {...field}
+                          disabled={isSubmitting}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <Button
+                  type="submit"
+                  className="w-full"
+                  disabled={isSubmitting || !token}
+                >
+                  {isSubmitting ? "Resetting..." : "Reset Password"}
+                </Button>
+              </form>
+            </Form>
+          </>
+        )}
+      </CardContent>
+      <CardFooter className="flex justify-center">
+        <Link
+          href="/auth/signin"
+          className="text-sm text-primary hover:underline"
+        >
+          Back to Sign In
+        </Link>
+      </CardFooter>
+    </Card>
+  )
+}
+
+// Main page component with Suspense boundary
+export default function ResetPasswordPage() {
+  return (
+    <div className="container flex items-center justify-center min-h-screen py-12">
+      <Suspense fallback={
+        <Card className="w-full max-w-md">
+          <CardHeader>
+            <CardTitle className="text-2xl font-bold">Loading...</CardTitle>
+          </CardHeader>
+        </Card>
+      }>
+        <ResetPasswordForm />
+      </Suspense>
     </div>
   )
 }

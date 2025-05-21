@@ -7,8 +7,7 @@ import { getPermissionUtils } from "@/lib/auth-utils"
  * Type for API route handlers
  */
 export type RouteHandler = (
-  req: NextRequest,
-  context: { params: Record<string, string | string[]> }
+  req: NextRequest
 ) => Promise<NextResponse>
 
 /**
@@ -18,7 +17,7 @@ export type RouteHandler = (
  * @returns A new handler that checks authentication before executing the original handler
  */
 export function withAuth(handler: RouteHandler): RouteHandler {
-  return async (req, context) => {
+  return async (req) => {
     const session = await auth()
     
     if (!session?.user) {
@@ -28,7 +27,7 @@ export function withAuth(handler: RouteHandler): RouteHandler {
       )
     }
     
-    return handler(req, context)
+    return handler(req)
   }
 }
 
@@ -40,7 +39,7 @@ export function withAuth(handler: RouteHandler): RouteHandler {
  * @returns A new handler that checks permission before executing the original handler
  */
 export function withPermission(handler: RouteHandler, permission: Permission): RouteHandler {
-  return async (req, context) => {
+  return async (req) => {
     const permissionUtils = await getPermissionUtils()
     
     if (!permissionUtils.session?.user) {
@@ -57,7 +56,7 @@ export function withPermission(handler: RouteHandler, permission: Permission): R
       )
     }
     
-    return handler(req, context)
+    return handler(req)
   }
 }
 
@@ -69,7 +68,7 @@ export function withPermission(handler: RouteHandler, permission: Permission): R
  * @returns A new handler that checks role before executing the original handler
  */
 export function withRole(handler: RouteHandler, role: Role): RouteHandler {
-  return async (req, context) => {
+  return async (req) => {
     const permissionUtils = await getPermissionUtils()
     
     if (!permissionUtils.session?.user) {
@@ -86,7 +85,7 @@ export function withRole(handler: RouteHandler, role: Role): RouteHandler {
       )
     }
     
-    return handler(req, context)
+    return handler(req)
   }
 }
 
@@ -98,7 +97,7 @@ export function withRole(handler: RouteHandler, role: Role): RouteHandler {
  * @returns A new handler that checks permissions before executing the original handler
  */
 export function withAnyPermission(handler: RouteHandler, permissions: Permission[]): RouteHandler {
-  return async (req, context) => {
+  return async (req) => {
     const permissionUtils = await getPermissionUtils()
     
     if (!permissionUtils.session?.user) {
@@ -115,7 +114,7 @@ export function withAnyPermission(handler: RouteHandler, permissions: Permission
       )
     }
     
-    return handler(req, context)
+    return handler(req)
   }
 }
 
@@ -127,7 +126,7 @@ export function withAnyPermission(handler: RouteHandler, permissions: Permission
  * @returns A new handler that checks permissions before executing the original handler
  */
 export function withAllPermissions(handler: RouteHandler, permissions: Permission[]): RouteHandler {
-  return async (req, context) => {
+  return async (req) => {
     const permissionUtils = await getPermissionUtils()
     
     if (!permissionUtils.session?.user) {
@@ -144,6 +143,6 @@ export function withAllPermissions(handler: RouteHandler, permissions: Permissio
       )
     }
     
-    return handler(req, context)
+    return handler(req)
   }
 }

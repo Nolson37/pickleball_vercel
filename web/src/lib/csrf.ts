@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import crypto from "crypto"
+import { RouteHandler } from "@/lib/api-middleware"
 
 // Constants
 const CSRF_COOKIE_NAME = "csrf_token"
@@ -58,12 +59,12 @@ export function validateCsrfToken(request: NextRequest): boolean {
  * @param handler - The route handler
  * @returns A new handler that validates CSRF tokens
  */
-export function withCsrfProtection(handler: Function): Function {
-  return async (req: NextRequest, ...args: any[]) => {
+export function withCsrfProtection(handler: RouteHandler): RouteHandler {
+  return async (req: NextRequest) => {
     // Skip CSRF validation for GET, HEAD, OPTIONS requests
     const method = req.method.toUpperCase()
     if (["GET", "HEAD", "OPTIONS"].includes(method)) {
-      return handler(req, ...args)
+      return handler(req)
     }
     
     // Validate CSRF token for other methods
@@ -74,7 +75,7 @@ export function withCsrfProtection(handler: Function): Function {
       )
     }
     
-    return handler(req, ...args)
+    return handler(req)
   }
 }
 

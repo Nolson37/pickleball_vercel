@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
-import bcrypt from "bcrypt"
+import bcrypt from "bcryptjs"
 import crypto from "crypto"
 import nodemailer from "nodemailer"
 import { prisma } from "@/lib/prisma"
@@ -164,7 +164,7 @@ export async function POST(request: NextRequest) {
     tokenExpiry.setHours(tokenExpiry.getHours() + 24) // Token expires in 24 hours
     
     // Create user, organization, and user-organization relationship in a transaction
-    const result = await prisma.$transaction(async (tx: typeof prisma) => {
+    const result = await prisma.$transaction(async (tx) => {
       // Create organization
       const organization = await tx.organization.create({
         data: {
