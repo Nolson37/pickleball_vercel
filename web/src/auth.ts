@@ -13,6 +13,7 @@ const credentialsSchema = z.object({
 })
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
+  trustHost: true, // Trust the host header for CSRF protection
   adapter: PrismaAdapter(prisma),
   session: {
     strategy: "jwt",
@@ -22,30 +23,30 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   // Configure cookies for proper CSRF protection
   cookies: {
     sessionToken: {
-      name: `__Secure-next-auth.session-token`,
+      name: `next-auth.session-token`,
       options: {
         httpOnly: true,
         sameSite: "lax",
         path: "/",
-        secure: true
+        secure: process.env.NODE_ENV === "production"
       }
     },
     callbackUrl: {
-      name: `__Secure-next-auth.callback-url`,
+      name: `next-auth.callback-url`,
       options: {
         httpOnly: true,
         sameSite: "lax",
         path: "/",
-        secure: true
+        secure: process.env.NODE_ENV === "production"
       }
     },
     csrfToken: {
-      name: `__Host-next-auth.csrf-token`,
+      name: `next-auth.csrf-token`,
       options: {
         httpOnly: true,
         sameSite: "lax",
         path: "/",
-        secure: true
+        secure: process.env.NODE_ENV === "production"
       }
     }
   },
@@ -119,6 +120,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         email: { label: "Email", type: "email" },
         password: { label: "Password", type: "password" },
         remember: { label: "Remember Me", type: "boolean" },
+        csrfToken: { label: "CSRF Token", type: "text" },
       },
       async authorize(credentials, req) {
         try {
