@@ -120,7 +120,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         email: { label: "Email", type: "email" },
         password: { label: "Password", type: "password" },
         remember: { label: "Remember Me", type: "boolean" },
-        csrfToken: { label: "CSRF Token", type: "text" },
       },
       async authorize(credentials, req) {
         try {

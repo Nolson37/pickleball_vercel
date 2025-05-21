@@ -13,7 +13,6 @@ import { Input } from "@/components/ui/input"
 import { Checkbox } from "@/components/ui/checkbox"
 import Link from "next/link"
 import { Suspense } from "react"
-import { useCsrf } from "@/hooks/use-csrf"
 
 // Define validation schema for sign-in
 const signInSchema = z.object({
@@ -49,8 +48,6 @@ function SignInForm() {
         : null
   )
   
-  // Get CSRF token
-  const { csrfToken, loading: csrfLoading } = useCsrf()
 
   const form = useForm<SignInFormValues>({
     resolver: zodResolver(signInSchema) as any,
@@ -66,12 +63,10 @@ function SignInForm() {
     setAuthError(null)
     
     try {
-      // Include CSRF token in the sign-in request
       const result = await signIn("credentials", {
         email: values.email,
         password: values.password,
         remember: values.rememberMe,
-        csrfToken: csrfToken,
         redirect: false,
       })
       
@@ -105,15 +100,8 @@ function SignInForm() {
           </div>
         )}
         
-        {csrfLoading ? (
-          <div className="flex justify-center py-4">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-          </div>
-        ) : (
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-              {/* Hidden CSRF token field */}
-              <input type="hidden" name="csrfToken" value={csrfToken || ''} />
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
             <FormField
               control={form.control}
               name="email"
@@ -179,7 +167,6 @@ function SignInForm() {
             </Button>
             </form>
           </Form>
-        )}
       </CardContent>
       <CardFooter className="flex flex-col space-y-4">
         <div className="text-sm text-center">
