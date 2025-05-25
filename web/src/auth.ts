@@ -1,7 +1,7 @@
 import NextAuth from "next-auth"
 import { PrismaAdapter } from "@auth/prisma-adapter"
 import CredentialsProvider from "next-auth/providers/credentials"
-import bcrypt from "bcrypt"
+import bcrypt from "bcryptjs"
 import { z } from "zod"
 import { prisma } from "@/lib/prisma"
 
@@ -9,17 +9,57 @@ import { prisma } from "@/lib/prisma"
 const credentialsSchema = z.object({
   email: z.string().email({ message: "Please enter a valid email address" }),
   password: z.string().min(8, { message: "Password must be at least 8 characters" }),
-  remember: z.boolean().optional(),
+  remember: z.preprocess(
+    (val) => {
+      if (typeof val === 'string') {
+        if (val.toLowerCase() === 'true') return true;
+        if (val.toLowerCase() === 'false') return false;
+      }
+      return val;
+    },
+    z.boolean().optional()
+  ),
 })
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
+  secret: process.env.AUTH_SECRET,
+  trustHost: true, // Trust the host header for CSRF protection
   adapter: PrismaAdapter(prisma),
   session: {
     strategy: "jwt",
     maxAge: 30 * 24 * 60 * 60, // 30 days by default
   },
   debug: process.env.NODE_ENV === 'development',
-  skipCSRFCheck: process.env.NODE_ENV === 'development', // Skip CSRF check in development
+  // Configure cookies for proper CSRF protection
+  cookies: {
+    sessionToken: {
+      name: `next-auth.session-token`,
+      options: {
+        httpOnly: true,
+        sameSite: "lax",
+        path: "/",
+        secure: process.env.NODE_ENV === "production"
+      }
+    },
+    callbackUrl: {
+      name: `next-auth.callback-url`,
+      options: {
+        httpOnly: true,
+        sameSite: "lax",
+        path: "/",
+        secure: process.env.NODE_ENV === "production"
+      }
+    },
+    csrfToken: {
+      name: `next-auth.csrf-token`,
+      options: {
+        httpOnly: true,
+        sameSite: "lax",
+        path: "/",
+        secure: process.env.NODE_ENV === "production" ? true : false
+      }
+    }
+  },
   pages: {
     signIn: "/auth/signin",
     signOut: "/auth/signout",
@@ -57,6 +97,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         token.remember = true
       }
       
+      console.log("JWT Callback Token:", token);
       return token
     },
     async session({ session, token, trigger }) {
@@ -67,6 +108,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         session.user.organizationSlug = token.organizationSlug as string
         session.user.roles = token.roles as string[]
       }
+      console.log("Session Callback Session:", session);
+      console.log("Session Callback Token:", token);
       return session
     },
     authorized({ auth, request }) {
@@ -92,47 +135,63 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         remember: { label: "Remember Me", type: "boolean" },
       },
       async authorize(credentials, req) {
+        console.log("[AUTH_DEBUG] Authorize function called with credentials:", credentials);
         try {
           // Validate credentials
           const { email, password, remember } = credentialsSchema.parse(credentials)
+          console.log("[AUTH_DEBUG] Credentials parsed:", { email, remember });
           
           // Find user by email
           const user = await prisma.user.findUnique({
             where: { email },
           })
+          console.log("[AUTH_DEBUG] User found in DB:", user ? { id: user.id, email: user.email, hasPasswordHash: !!user.passwordHash } : null);
           
           // Check if user exists and password is correct
           if (!user || !user.passwordHash) {
+            console.log("[AUTH_DEBUG] User not found or no password hash.");
             return null
           }
           
+          console.log("[AUTH_DEBUG] Comparing password for user:", user.email);
           const isPasswordValid = await bcrypt.compare(password, user.passwordHash)
+          console.log("[AUTH_DEBUG] Password valid:", isPasswordValid);
           
           if (!isPasswordValid) {
+            console.log("[AUTH_DEBUG] Password comparison failed.");
             return null
           }
           
           // Check if email is verified (emailVerified is a DateTime? in the schema)
           // In development mode, we'll bypass this check
+          console.log("[AUTH_DEBUG] Checking email verification. User verified:", user.emailVerified, "NODE_ENV:", process.env.NODE_ENV);
           if (!user.emailVerified && process.env.NODE_ENV === 'production') {
+            console.log("[AUTH_DEBUG] Email not verified in production. Throwing error.");
             throw new Error("Email not verified. Please check your inbox.")
           }
           
           // Update lastLogin timestamp
+          console.log("[AUTH_DEBUG] Updating lastLogin for user:", user.id);
           await prisma.user.update({
             where: { id: user.id },
             data: { lastLogin: new Date() }
           })
+          console.log("[AUTH_DEBUG] lastLogin updated.");
           
           // Return user object
-          return {
+          const userToReturn = {
             id: user.id,
             email: user.email,
             name: user.name,
             image: user.imageUrl,
-          }
+          };
+          console.log("[AUTH_DEBUG] Returning user object:", userToReturn);
+          return userToReturn
         } catch (error) {
-          console.error("Authentication error:", error)
+          console.error("[AUTH_DEBUG] Authentication error in authorize function:", error);
+          if (error instanceof z.ZodError) {
+            console.error("[AUTH_DEBUG] Zod validation errors:", error.errors);
+          }
           return null
         }
       },
