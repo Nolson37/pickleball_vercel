@@ -1,11 +1,10 @@
 import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
-import bcrypt from "bcrypt"
+import bcrypt from "bcryptjs"
 import { auth } from "@/auth"
 import { prisma } from "@/lib/prisma"
 import { withAuth } from "@/lib/api-middleware"
-import { withCsrfProtection } from "@/lib/csrf"
-import { 
+import {
   PASSWORD_CRITERIA,
   hasUppercase,
   hasLowercase,
@@ -119,4 +118,4 @@ async function changePasswordHandler(request: NextRequest) {
 }
 
 // Export the handler with authentication and CSRF protection middleware
-export const POST = withCsrfProtection(withAuth(changePasswordHandler))
+export const POST = withAuth(changePasswordHandler)

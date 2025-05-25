@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/auth"
 import { prisma } from "@/lib/prisma"
-import { withCsrfProtection } from "@/lib/csrf"
+import { withAuth } from "@/lib/api-middleware"
 
-export const POST = withCsrfProtection(async (req: NextRequest) => {
+export const POST = withAuth(async (req: NextRequest) => {
   try {
     const session = await auth()
     
