@@ -2,6 +2,7 @@
 
 import { useSearchParams } from "next/navigation"
 import Link from "next/link"
+import { Suspense } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 
@@ -16,13 +17,21 @@ const errorMessages: Record<string, string> = {
   Default: "An unexpected error occurred. Please try again."
 }
 
-export default function AuthErrorPage() {
+function ErrorContent() {
   const searchParams = useSearchParams()
   const error = searchParams.get("error") || "Default"
   
   // Get the error message or use the default
   const errorMessage = errorMessages[error] || errorMessages.Default
 
+  return (
+    <div className="p-4 bg-destructive/10 rounded-md text-destructive">
+      {errorMessage}
+    </div>
+  )
+}
+
+export default function AuthErrorPage() {
   return (
     <div className="container flex items-center justify-center min-h-screen py-12">
       <Card className="w-full max-w-md border-2 border-destructive">
@@ -33,9 +42,13 @@ export default function AuthErrorPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="p-4 bg-destructive/10 rounded-md text-destructive">
-            {errorMessage}
-          </div>
+          <Suspense fallback={
+            <div className="p-4 bg-destructive/10 rounded-md text-destructive">
+              Loading error details...
+            </div>
+          }>
+            <ErrorContent />
+          </Suspense>
         </CardContent>
         <CardFooter className="flex flex-col space-y-4">
           <Button className="w-full" asChild>

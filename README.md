@@ -31,13 +31,92 @@ This platform aims to differentiate from existing tools by being:
 
 ## Getting Started
 
-### Prerequisites
+You can run this application either with Docker (recommended) or with a local development setup.
+
+### Option 1: Docker Deployment (Recommended)
+
+#### Prerequisites
+
+- Docker 20.x or higher
+- Docker Compose 2.x or higher
+
+#### Quick Start with Docker
+
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/your-username/pickleball-business-management.git
+   cd pickleball-business-management
+   ```
+
+2. Start the application:
+   ```bash
+   ./docker-start.sh
+   ```
+
+   Or manually from the web directory:
+   ```bash
+   cd web
+   docker compose up --build
+   ```
+
+   This will:
+   - Build the Docker images
+   - Start PostgreSQL database with initialization
+   - Start the Next.js application
+   - Run database migrations automatically
+   - Make the application available at [http://localhost:3000](http://localhost:3000)
+
+#### Manual Docker Commands
+
+All Docker commands should be run from the `web` directory:
+
+```bash
+cd web
+
+# Build and start all services
+docker compose up --build
+
+# Run in background
+docker compose up --build -d
+
+# View logs
+docker compose logs -f
+
+# Stop all services
+docker compose down
+
+# Stop and remove volumes (WARNING: This will delete all data)
+docker compose down --volumes
+```
+
+#### Docker Management Commands
+
+```bash
+# Access the database (run from web directory)
+docker compose exec db psql -U postgres -d pickleball
+
+# Access the application container
+docker compose exec app sh
+
+# View application logs
+docker compose logs app
+
+# View database logs
+docker compose logs db
+
+# Restart specific service
+docker compose restart app
+```
+
+### Option 2: Local Development Setup
+
+#### Prerequisites
 
 - Node.js 18.x or higher
 - npm 9.x or higher
 - PostgreSQL database (or Vercel Postgres)
 
-### Installation
+#### Installation
 
 1. Clone the repository:
    ```bash

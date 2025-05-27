@@ -1248,3 +1248,37 @@ The system is designed to work seamlessly while also being usable independently 
    - Email configuration variables
 
 The development server is now running successfully with the environment variables properly loaded.
+
+[2025-05-27 22:53:33] - ## Docker Containerization Complete - 2025-05-27
+
+### Task: Update project to run inside Docker containers
+
+**Completed Requirements:**
+1. ✅ Both DB and Application start from the same command (`docker compose up --build`)
+2. ✅ DB is working (PostgreSQL 16-alpine with initialization script)
+3. ✅ Application can communicate with DB (verified through browser testing)
+4. ✅ README.md updated with correct Docker instructions
+
+**Implementation Details:**
+- Created `docker-compose.yml` in web directory with PostgreSQL and Next.js services
+- Added custom `Dockerfile` for Next.js application with multi-stage build
+- Created database initialization script in `init-db/01-init.sql`
+- Implemented proper health checks and wait-for-it dependency management
+- Application available at http://localhost:3000
+- Database available at localhost:5432
+
+**Files Created/Modified:**
+- `web/docker-compose.yml` - Docker Compose configuration
+- `web/Dockerfile` - Next.js application container
+- `web/.dockerignore` - Docker ignore file
+- `web/wait-for-it.sh` - Database dependency script
+- `init-db/01-init.sql` - Database initialization
+- `.env.docker` - Docker environment variables
+- `docker-start.sh` - Convenience startup script
+- `README.md` - Updated with Docker instructions
+
+**Testing Completed:**
+- Container startup and health verification
+- Application accessibility on port 3000
+- Database connectivity verification
+- Homepage and authentication page loading

@@ -1,0 +1,47 @@
+# Git
+.git
+.gitignore
+
+# Docker
+docker-compose.yml
+Dockerfile*
+.dockerignore
+
+# Documentation
+README.md
+docs/
+*.md
+
+# Node modules (handled by individual service dockerignores)
+node_modules
+
+# Environment files (use .env.docker instead)
+.env
+.env.local
+.env.*.local
+
+# Logs
+*.log
+logs/
+
+# Development tools
+.vscode
+.idea
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Testing
+coverage/
+__tests__/
+e2e/
+*.test.*
+*.spec.*
+
+# Memory bank (development only)
+memory-bank/
+
+# Temporary files
+*.tmp
+*.temp

@@ -1,0 +1,60 @@
+services:
+  # PostgreSQL Database
+  db:
+    image: postgres:16-alpine
+    container_name: pickleball-db
+    restart: always
+    user: postgres
+    environment:
+      POSTGRES_DB: pickleball
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: pickleball_secret_password
+      POSTGRES_INITDB_ARGS: "--auth-host=scram-sha-256 --auth-local=scram-sha-256"
+    volumes:
+      - db-data:/var/lib/postgresql/data
+      - ./init-db:/docker-entrypoint-initdb.d
+    ports:
+      - "5432:5432"
+    networks:
+      - pickleball-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d pickleball"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # Next.js Application
+  app:
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+    container_name: pickleball-app
+    restart: always
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=postgresql://postgres:pickleball_secret_password@db:5432/pickleball
+      - NEXTAUTH_URL=http://localhost:3000
+      - NEXTAUTH_SECRET=your-super-secret-nextauth-key-change-in-production
+      - EMAIL_SERVER=smtp://localhost:587
+      - EMAIL_FROM=noreply@pickleball.localhost
+    networks:
+      - pickleball-network
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      # Mount logs for debugging if needed
+      - app-logs:/app/logs
+
+volumes:
+  db-data:
+    driver: local
+  app-logs:
+    driver: local
+
+networks:
+  pickleball-network:
+    driver: bridge
