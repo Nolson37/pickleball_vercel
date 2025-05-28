@@ -2,7 +2,11 @@ import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
 import crypto from "crypto"
 import nodemailer from "nodemailer"
+import { trace, SpanStatusCode } from "@opentelemetry/api"
 import { prisma } from "@/lib/prisma"
+
+// Get tracer for forgot password flows
+const tracer = trace.getTracer('api-auth', '1.0.0')
 
 // Define validation schema for forgot password
 const forgotPasswordSchema = z.object({
@@ -66,69 +70,151 @@ async function sendPasswordResetEmail(email: string, token: string) {
 }
 
 export async function POST(request: NextRequest) {
-  try {
-    // Parse request body
-    const body = await request.json()
-    
-    // Validate request body
-    const { email } = forgotPasswordSchema.parse(body)
-    
-    // Check if user exists
-    const user = await prisma.user.findUnique({
-      where: { email },
-    })
-    
-    // If user doesn't exist, we still return a success response for security reasons
-    // This prevents email enumeration attacks
-    if (!user) {
+  return tracer.startActiveSpan('api-forgot-password', async (span) => {
+    try {
+      // Add basic request attributes
+      span.setAttributes({
+        'http.method': 'POST',
+        'http.url': request.url,
+        'request.type': 'password_reset_request',
+        'operation.name': 'initiate_password_reset'
+      })
+      
+      // Parse request body
+      const body = await request.json()
+      
+      // Validate request body
+      const { email } = forgotPasswordSchema.parse(body)
+      
+      // Add email context to span
+      span.setAttributes({
+        'user.email': email
+      })
+      
+      // Check if user exists
+      const user = await prisma.user.findUnique({
+        where: { email },
+      })
+      
+      // Add user existence context
+      span.setAttributes({
+        'database.user_found': !!user,
+        'user.exists': !!user
+      })
+      
+      // If user doesn't exist, we still return a success response for security reasons
+      // This prevents email enumeration attacks
+      if (!user) {
+        span.setAttributes({
+          'password_reset.success': true,
+          'password_reset.user_found': false,
+          'password_reset.email_sent': false,
+          'security.enumeration_protection': true,
+          'http.status_code': 200
+        })
+        span.setStatus({ code: SpanStatusCode.OK })
+        
+        return NextResponse.json(
+          { success: true, message: "If an account with this email exists, a password reset link has been sent." },
+          { status: 200 }
+        )
+      }
+      
+      // Add user context to span
+      span.setAttributes({
+        'user.id': user.id,
+        'user.verified': !!user.emailVerified
+      })
+      
+      // Delete any existing password reset tokens for this user
+      const deletedTokens = await prisma.passwordResetToken.deleteMany({
+        where: { email },
+      })
+      
+      // Add token cleanup context
+      span.setAttributes({
+        'database.tokens_cleaned': deletedTokens.count
+      })
+      
+      // Generate password reset token
+      const resetToken = crypto.randomBytes(32).toString("hex")
+      const tokenExpiry = new Date()
+      tokenExpiry.setHours(tokenExpiry.getHours() + 24) // Token expires in 24 hours
+      
+      // Save password reset token
+      await prisma.passwordResetToken.create({
+        data: {
+          email,
+          token: resetToken,
+          expires: tokenExpiry,
+        },
+      })
+      
+      // Add token creation context
+      span.setAttributes({
+        'database.token_created': true,
+        'reset_token.expires_in_hours': 24
+      })
+      
+      // Send password reset email
+      await sendPasswordResetEmail(email, resetToken)
+      
+      // Add successful completion attributes
+      span.setAttributes({
+        'password_reset.success': true,
+        'password_reset.user_found': true,
+        'password_reset.email_sent': true,
+        'email.reset_sent': true,
+        'http.status_code': 200
+      })
+      span.setStatus({ code: SpanStatusCode.OK })
+      
+      // Return success response
       return NextResponse.json(
-        { success: true, message: "If an account with this email exists, a password reset link has been sent." },
+        { success: true, message: "Password reset link has been sent to your email." },
         { status: 200 }
       )
-    }
-    
-    // Delete any existing password reset tokens for this user
-    await prisma.passwordResetToken.deleteMany({
-      where: { email },
-    })
-    
-    // Generate password reset token
-    const resetToken = crypto.randomBytes(32).toString("hex")
-    const tokenExpiry = new Date()
-    tokenExpiry.setHours(tokenExpiry.getHours() + 24) // Token expires in 24 hours
-    
-    // Save password reset token
-    await prisma.passwordResetToken.create({
-      data: {
-        email,
-        token: resetToken,
-        expires: tokenExpiry,
-      },
-    })
-    
-    // Send password reset email
-    await sendPasswordResetEmail(email, resetToken)
-    
-    // Return success response
-    return NextResponse.json(
-      { success: true, message: "Password reset link has been sent to your email." },
-      { status: 200 }
-    )
-  } catch (error) {
-    console.error("Forgot password error:", error)
-    
-    // Handle validation errors
-    if (error instanceof z.ZodError) {
+    } catch (error) {
+      console.error("Forgot password error:", error)
+      
+      // Record and trace the exception
+      span.recordException(error as Error)
+      span.setAttributes({
+        'password_reset.success': false,
+        'error.type': error instanceof z.ZodError ? 'validation_error' : 'password_reset_error'
+      })
+      
+      // Handle validation errors
+      if (error instanceof z.ZodError) {
+        span.setAttributes({
+          'password_reset.failure_reason': 'validation_error',
+          'validation.errors': JSON.stringify(error.errors),
+          'http.status_code': 400
+        })
+        span.setStatus({ code: SpanStatusCode.ERROR, message: 'Validation error' })
+        
+        return NextResponse.json(
+          { error: "Validation error", details: error.errors },
+          { status: 400 }
+        )
+      }
+      
+      // Handle other errors
+      span.setAttributes({
+        'password_reset.failure_reason': 'internal_error',
+        'http.status_code': 500
+      })
+      span.setStatus({
+        code: SpanStatusCode.ERROR,
+        message: (error as Error).message
+      })
+      
       return NextResponse.json(
-        { error: "Validation error", details: error.errors },
-        { status: 400 }
+        { error: "Failed to send password reset email. Please try again." },
+        { status: 500 }
       )
+    } finally {
+      span.end()
     }
-    
-    // Handle other errors
-    return NextResponse.json(
-      { error: "Failed to send password reset email. Please try again." },
-      { status: 500 }
-    )
-  }
+  })
 }

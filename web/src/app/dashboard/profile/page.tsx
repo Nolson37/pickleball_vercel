@@ -1,22 +1,26 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
 import { z } from "zod"
+import { trace, SpanStatusCode } from "@opentelemetry/api"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
 import { PasswordStrengthIndicator } from "@/components/auth/password-strength-indicator"
-import { 
+import {
   PASSWORD_CRITERIA,
   hasUppercase,
   hasLowercase,
   hasNumber,
   hasSpecialChar
 } from "@/lib/password-validation"
+
+// Get tracer for dashboard pages
+const tracer = trace.getTracer('page-dashboard', '1.0.0')
 
 // Password validation schema
 const passwordSchema = z.string()
@@ -72,42 +76,118 @@ export default function ProfilePage() {
     },
   })
 
+  // Trace page load
+  useEffect(() => {
+    tracer.startActiveSpan('page-profile', (span) => {
+      span.setAttributes({
+        'page.route': '/dashboard/profile',
+        'page.title': 'Profile',
+        'user.authenticated': true,
+        'page.type': 'dashboard',
+        'page.section': 'user_management'
+      })
+      span.setStatus({ code: SpanStatusCode.OK })
+      span.end()
+    })
+  }, [])
+
   async function onSubmit(values: PasswordChangeFormValues) {
     setIsSubmitting(true)
     setError(null)
     
-    try {
-      // NextAuth handles CSRF protection automatically
-      const response = await fetch("/api/auth/change-password", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          currentPassword: values.currentPassword,
-          newPassword: values.newPassword,
-        }),
-      })
-      
-      const data = await response.json()
-      
-      if (!response.ok) {
-        throw new Error(data.error || "Failed to change password")
+    // Create a span for the password change attempt
+    return tracer.startActiveSpan('change-password-attempt', async (span) => {
+      try {
+        // Add span attributes for context
+        span.setAttributes({
+          'form.type': 'change_password',
+          'operation.type': 'password_update',
+          'user.action': 'change_password',
+          'form.validation.success': true
+        })
+        
+        // NextAuth handles CSRF protection automatically
+        const response = await fetch("/api/auth/change-password", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            currentPassword: values.currentPassword,
+            newPassword: values.newPassword,
+          }),
+        })
+        
+        const data = await response.json()
+        
+        if (!response.ok) {
+          // Record API failure
+          const errorMessage = data.error || "Failed to change password"
+          span.recordException(new Error(`API request failed: ${errorMessage}`))
+          span.setStatus({
+            code: SpanStatusCode.ERROR,
+            message: errorMessage
+          })
+          span.setAttributes({
+            'form.submission.success': false,
+            'api.response.status': response.status,
+            'error.type': 'api_failure',
+            'error.message': errorMessage,
+            'password.change_success': false
+          })
+          
+          throw new Error(errorMessage)
+        }
+        
+        // Record successful password change
+        span.setAttributes({
+          'form.submission.success': true,
+          'api.response.status': response.status,
+          'password.change_success': true,
+          'user.action': 'password_changed',
+          'navigation.target': '/dashboard'
+        })
+        span.setStatus({ code: SpanStatusCode.OK })
+        
+        setIsSuccess(true)
+        form.reset()
+        
+        // Redirect to dashboard after 3 seconds
+        setTimeout(() => {
+          tracer.startActiveSpan('navigation-redirect', (navSpan) => {
+            navSpan.setAttributes({
+              'navigation.source': '/dashboard/profile',
+              'navigation.target': '/dashboard',
+              'navigation.trigger': 'auto_redirect',
+              'navigation.delay_ms': 3000,
+              'user.action': 'return_to_dashboard'
+            })
+            navSpan.setStatus({ code: SpanStatusCode.OK })
+            navSpan.end()
+            
+            router.push("/dashboard")
+          })
+        }, 3000)
+      } catch (error) {
+        // Record and trace the exception
+        span.recordException(error as Error)
+        span.setStatus({
+          code: SpanStatusCode.ERROR,
+          message: (error as Error).message
+        })
+        span.setAttributes({
+          'form.submission.success': false,
+          'error.type': 'unexpected_error',
+          'password.change_success': false
+        })
+        
+        console.error("Password change error:", error)
+        setError(error instanceof Error ? error.message : "An unexpected error occurred")
+      } finally {
+        setIsSubmitting(false)
+        span.end()
       }
-      
-      setIsSuccess(true)
-      form.reset()
-      
-      // Redirect to dashboard after 3 seconds
-      setTimeout(() => {
-        router.push("/dashboard")
-      }, 3000)
-    } catch (error) {
-      console.error("Password change error:", error)
-      setError(error instanceof Error ? error.message : "An unexpected error occurred")
-    } finally {
-      setIsSubmitting(false)
-    }
+    })
   }
 
   return (

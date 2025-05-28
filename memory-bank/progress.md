@@ -1308,3 +1308,139 @@ The development server is now running successfully with the environment variable
 ✅ Comprehensive documentation and setup instructions
 
 The branch is ready for review and merging into main branch.
+
+[2025-05-28 22:30:36] - ## SUBTASK 2: OpenTelemetry Frontend Page Tracing - COMPLETED ✅
+
+**SCOPE**: Add comprehensive OpenTelemetry tracing to ALL frontend page components
+
+**COMPONENTS ENHANCED**:
+
+### Authentication Pages (`src/app/auth/`):
+- ✅ `/auth/signin/page.tsx` - Already implemented
+- ✅ `/auth/forgot-password/page.tsx` - Page load + form submission tracing
+- ✅ `/auth/reset-password/page.tsx` - Page load + token validation + password reset tracing
+- ✅ `/auth/verification-success/page.tsx` - Page load + navigation tracing
+- ✅ `/auth/error/page.tsx` - Page load + error display + navigation tracing
+
+### Dashboard Pages (`src/app/dashboard/`):
+- ✅ `/dashboard/page.tsx` - Page load + auth + database + onboarding tracing
+- ✅ `/dashboard/profile/page.tsx` - Page load + password change tracing
+- ✅ `/dashboard/organization/page.tsx` - Page load + auth + permissions + org/member lookups
+- ✅ `/dashboard/users/page.tsx` - Page load + auth + permissions + org/user lookups
+- ✅ `/dashboard/users/invite/page.tsx` - Page load + auth + permissions tracing
+- ✅ `/dashboard/facilities/page.tsx` - Page load + auth + permissions + facility lookups
+- ✅ `/dashboard/facilities/new/page.tsx` - Page load + auth + permissions tracing
+
+### Root Pages:
+- ✅ `/page.tsx` - Landing page load tracing
+
+**IMPLEMENTATION FEATURES**:
+- **Page Load Spans**: Consistent `page-[route-name]` naming convention
+- **User Interaction Spans**: Form submissions, navigation, button clicks
+- **Comprehensive Attributes**: page.route, page.title, user.authenticated, navigation context
+- **Form Tracking**: form.type, form.validation.success, form.submission.success
+- **Error Handling**: span.recordException() + SpanStatusCode.ERROR for all failures
+- **Success Tracking**: SpanStatusCode.OK + completion metrics
+- **Database Context**: Query tracking with success/failure states
+- **Authentication Context**: Session + permission checks
+- **API Integration**: Ready to connect with backend trace spans
+
+**TRACER ORGANIZATION**:
+- `'page-auth'` v1.0.0 - Authentication pages
+- `'page-dashboard'` v1.0.0 - Dashboard pages
+- `'page-landing'` v1.0.0 - Landing page
+- `'signin-flow'` v1.0.0 - Signin form (existing)
+
+**TECHNICAL APPROACH**:
+- Server components: Wrapped main functions with tracer spans
+- Client components: useEffect hooks for page load tracing
+- Consistent error handling with try/catch/finally
+- TypeScript type safety maintained
+- Proper span lifecycle management
+
+**STATUS**: All frontend page components now have comprehensive OpenTelemetry tracing capturing complete user journey from page loads to API calls.
+
+[2025-05-28 22:31:44] - ## SUBTASK 3: OpenTelemetry Database Operations and Core Libraries Tracing - STARTED
+
+**DATE**: 2025-05-28 22:31
+**SCOPE**: Add comprehensive OpenTelemetry tracing to database operations and core libraries
+
+**TARGET COMPONENTS**:
+1. Database Operations (`src/lib/prisma.ts`) - Prisma client with query-level tracing
+2. Authentication Utilities (`src/lib/auth-*.ts`) - Auth helper functions
+3. Core Application Libraries (`src/lib/api-middleware.ts`, `src/lib/utils.ts`)
+4. Middleware (`src/middleware.ts`) - Request routing and authentication
+
+**IMPLEMENTATION REQUIREMENTS**:
+- Database spans: `db-[operation]` (e.g., `db-user-findUnique`)
+- Function spans: `[library]-[function]` (e.g., `auth-validatePassword`)
+- Middleware spans: `middleware-[operation]` (e.g., `middleware-auth`)
+- Comprehensive attributes for business context
+- End-to-end trace connectivity from frontend to database
+
+**STATUS**: Starting implementation...
+
+[2025-05-28 22:38:38] - ## SUBTASK 3: OpenTelemetry Database Operations and Core Libraries Tracing - COMPLETED ✅
+
+**DATE**: 2025-05-28 22:38
+**SCOPE**: Add comprehensive OpenTelemetry tracing to database operations and core libraries
+
+**COMPLETED IMPLEMENTATIONS**:
+
+### 1. Database Operations (`src/lib/prisma.ts`) ✅
+- Enhanced Prisma client with automatic query-level tracing using Prisma middleware
+- **Database Spans**: `db-[operation]` (e.g., `db-user-findUnique`, `db-organization-create`)
+- **Database Attributes**: 
+  - `db.operation`, `db.table`, `db.query_type`, `db.action`, `db.model`
+  - `db.affected_rows`, `db.duration`, `db.success`
+  - `db.system` (postgresql), `db.name` (pickleball_platform)
+- Query performance metrics and error handling with span status
+- Automatic operation type detection (SELECT, INSERT, UPDATE, DELETE, etc.)
+
+### 2. Authentication Utilities ✅
+- **`/src/lib/auth-utils.ts`**: Enhanced all permission/role checking functions
+  - Spans: `auth-getPermissionUtils`, `auth-checkPermission`, `auth-requirePermission`, etc.
+  - Attributes: `user.authenticated`, `user.id`, `permission.granted`, `authorization.result`
+- **`/src/lib/password-validation.ts`**: Enhanced all password validation functions
+  - Spans: `password-meetsMinimumLength`, `password-calculatePasswordStrength`, etc.
+  - Attributes: `validation.result`, `password.strength`, `validation.error_type`
+- **`/src/lib/rbac.ts`**: Enhanced role-based access control functions
+  - Spans: `rbac-hasRole`, `rbac-hasPermission`, `rbac-getPermissionsForRoles`, etc.
+  - Attributes: `role.granted`, `permission.granted`, `roles.matching`, `permissions.available`
+- **`/src/lib/auth-cookie-manager.ts`**: Enhanced cookie management operations
+  - Spans: `auth-cookie-clearAllAuthCookies`, `auth-cookie-performCompleteCleanup`, etc.
+  - Attributes: `cookies.cleared.count`, `storage.localStorage.cleared`, `operation.result`
+
+### 3. Core Application Libraries ✅
+- **`/src/lib/api-middleware.ts`**: Enhanced API middleware functions
+  - Spans: `api-middleware-withAuth`, `api-middleware-withPermission`, `api-middleware-withRole`
+  - Attributes: `middleware.type`, `authorization.result`, `permission.granted`, `response.status`
+- **`/src/lib/utils.ts`**: Enhanced utility functions
+  - Spans: `utils-cn` for Tailwind class merging
+  - Attributes: `inputs.count`, `result.length`, `result.classes`
+
+### 4. Middleware (`src/middleware.ts`) ✅
+- Enhanced request routing and authentication middleware
+- **Middleware Spans**: `middleware-auth`
+- **Middleware Attributes**: 
+  - `request.method`, `request.url`, `request.pathname`
+  - `route.type`, `route.protected`, `route.excluded`
+  - `middleware.result`, `middleware.protection`
+
+**TECHNICAL APPROACH**:
+- Imported OpenTelemetry APIs: `trace`, `SpanStatusCode`
+- Created appropriate tracers: `'database'`, `'auth-utils'`, `'password-validation'`, `'rbac'`, `'auth-cookie-manager'`, `'api-middleware'`, `'utils'`, `'middleware'`
+- Used Prisma middleware to automatically trace all database operations
+- Wrapped key functions with tracing spans
+- Added tracing to request processing pipeline
+- Ensured spans connect properly with existing API and page spans
+
+**COMPREHENSIVE END-TO-END TRACING**:
+✅ Frontend user action → Page component spans
+✅ API route spans → Middleware spans
+✅ Authentication/permission check spans
+✅ Database operation spans
+✅ Utility function spans
+✅ Complete trace connectivity from frontend to database and back
+
+**STATUS**: All database operations and core libraries now have comprehensive OpenTelemetry tracing with proper span naming, attributes, and end-to-end connectivity.

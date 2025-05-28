@@ -1,14 +1,18 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
 import { z } from "zod"
+import { trace, SpanStatusCode } from "@opentelemetry/api"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
 import Link from "next/link"
+
+// Get tracer for auth pages
+const tracer = trace.getTracer('page-auth', '1.0.0')
 
 // Define validation schema for forgot password
 const forgotPasswordSchema = z.object({
@@ -31,32 +35,91 @@ export default function ForgotPasswordPage() {
     },
   })
 
+  // Trace page load
+  useEffect(() => {
+    tracer.startActiveSpan('page-forgot-password', (span) => {
+      span.setAttributes({
+        'page.route': '/auth/forgot-password',
+        'page.title': 'Forgot Password',
+        'user.authenticated': false,
+        'page.type': 'auth'
+      })
+      span.setStatus({ code: SpanStatusCode.OK })
+      span.end()
+    })
+  }, [])
+
   async function onSubmit(values: ForgotPasswordFormValues) {
     setIsSubmitting(true)
     setError(null)
     
-    try {
-      const response = await fetch("/api/auth/forgot-password", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(values),
-      })
-      
-      const data = await response.json()
-      
-      if (!response.ok) {
-        throw new Error(data.error || "Failed to send password reset email")
+    // Create a span for the forgot password request
+    return tracer.startActiveSpan('forgot-password-request', async (span) => {
+      try {
+        // Add span attributes for context
+        span.setAttributes({
+          'user.email': values.email,
+          'form.type': 'forgot_password',
+          'operation.type': 'password_reset_request'
+        })
+        
+        const response = await fetch("/api/auth/forgot-password", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(values),
+        })
+        
+        const data = await response.json()
+        
+        if (!response.ok) {
+          // Record API failure
+          const errorMessage = data.error || "Failed to send password reset email"
+          span.recordException(new Error(`API request failed: ${errorMessage}`))
+          span.setStatus({
+            code: SpanStatusCode.ERROR,
+            message: errorMessage
+          })
+          span.setAttributes({
+            'form.submission.success': false,
+            'api.response.status': response.status,
+            'error.type': 'api_failure',
+            'error.message': errorMessage
+          })
+          
+          throw new Error(errorMessage)
+        }
+        
+        // Record successful request
+        span.setAttributes({
+          'form.submission.success': true,
+          'api.response.status': response.status,
+          'email.reset_sent': true,
+          'user.action': 'password_reset_requested'
+        })
+        span.setStatus({ code: SpanStatusCode.OK })
+        
+        setIsSuccess(true)
+      } catch (error) {
+        // Record and trace the exception
+        span.recordException(error as Error)
+        span.setStatus({
+          code: SpanStatusCode.ERROR,
+          message: (error as Error).message
+        })
+        span.setAttributes({
+          'form.submission.success': false,
+          'error.type': 'unexpected_error',
+        })
+        
+        console.error("Forgot password error:", error)
+        setError(error instanceof Error ? error.message : "An unexpected error occurred")
+      } finally {
+        setIsSubmitting(false)
+        span.end()
       }
-      
-      setIsSuccess(true)
-    } catch (error) {
-      console.error("Forgot password error:", error)
-      setError(error instanceof Error ? error.message : "An unexpected error occurred")
-    } finally {
-      setIsSubmitting(false)
-    }
+    })
   }
 
   return (
