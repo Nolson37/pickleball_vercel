@@ -61,15 +61,22 @@ export default async function FacilitiesPage() {
       updatedAt: new Date(),
     }
   } else {
-    // Get the user's organization from the database
-    const userWithOrganization = await prisma.user.findUnique({
+    // Get the user's organizations from the database
+    const userWithOrganizations = await prisma.user.findUnique({
       where: { id: user.id },
       include: {
-        organization: true,
+        organizations: {
+          include: {
+            organization: true,
+          },
+        },
       },
     })
     
-    organization = userWithOrganization?.organization
+    // Get the default organization or the first one
+    const userOrg = userWithOrganizations?.organizations.find(org => org.isDefault) ||
+                    userWithOrganizations?.organizations[0]
+    organization = userOrg?.organization
     
     if (!organization) {
       return (
@@ -166,12 +173,12 @@ export default async function FacilitiesPage() {
           <CardHeader>
             <CardTitle>No Facilities</CardTitle>
             <CardDescription>
-              You haven't added any facilities yet.
+              You haven&apos;t added any facilities yet.
             </CardDescription>
           </CardHeader>
           <CardContent>
             <p className="text-muted-foreground">
-              Get started by adding your first facility. You'll be able to manage courts, reservations, and more.
+              Get started by adding your first facility. You&apos;ll be able to manage courts, reservations, and more.
             </p>
           </CardContent>
           <CardFooter>

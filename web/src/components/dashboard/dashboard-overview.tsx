@@ -1,8 +1,17 @@
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 
+interface User {
+  id?: string;
+  name?: string | null;
+  email?: string | null;
+  organizationId?: string;
+  organizationName?: string;
+  roles?: string[];
+}
+
 interface DashboardOverviewProps {
-  user: any
+  user: User | null;
 }
 
 export function DashboardOverview({ user }: DashboardOverviewProps) {

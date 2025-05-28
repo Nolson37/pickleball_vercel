@@ -67,7 +67,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     newUser: "/auth/new-user",
   },
   callbacks: {
-    async jwt({ token, user, trigger, session }) {
+    async jwt({ token, user }) {
       // Add organization context to the token if available
       if (user) {
         token.userId = user.id
@@ -90,16 +90,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           token.roles = userOrg.roles
         }
       }
-      // Handle remember me option
-      if (trigger === "signIn" && session?.remember === true) {
-        // Extend token expiration to 30 days for "remember me"
-        token.remember = true
-      }
       
       console.log("JWT Callback Token:", token);
       return token
     },
-    async session({ session, token, trigger }) {
+    async session({ session, token }) {
       if (token && session.user) {
         session.user.id = token.userId as string
         session.user.organizationId = token.organizationId as string
@@ -133,7 +128,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         password: { label: "Password", type: "password" },
         remember: { label: "Remember Me", type: "boolean" },
       },
-      async authorize(credentials, req) {
+      async authorize(credentials) {
         console.log("[AUTH_DEBUG] Authorize function called with credentials:", credentials);
         try {
           // Validate credentials

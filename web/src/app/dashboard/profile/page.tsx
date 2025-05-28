@@ -6,7 +6,7 @@ import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
 import { z } from "zod"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
 import { PasswordStrengthIndicator } from "@/components/auth/password-strength-indicator"
@@ -54,12 +54,8 @@ const passwordChangeSchema = z.object({
   path: ["confirmPassword"],
 })
 
-// Define the form values type
-interface PasswordChangeFormValues {
-  currentPassword: string;
-  newPassword: string;
-  confirmPassword: string;
-}
+// Use the inferred type from the schema
+type PasswordChangeFormValues = z.infer<typeof passwordChangeSchema>
 
 export default function ProfilePage() {
   const router = useRouter()
@@ -68,7 +64,7 @@ export default function ProfilePage() {
   const [error, setError] = useState<string | null>(null)
 
   const form = useForm<PasswordChangeFormValues>({
-    resolver: zodResolver(passwordChangeSchema) as any,
+    resolver: zodResolver(passwordChangeSchema),
     defaultValues: {
       currentPassword: "",
       newPassword: "",

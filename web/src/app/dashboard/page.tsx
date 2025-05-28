@@ -1,6 +1,5 @@
 import { prisma } from "@/lib/prisma"
 import { auth } from "@/auth"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { DashboardOverview } from "@/components/dashboard/dashboard-overview"
 import { DashboardWelcome } from "@/components/dashboard/dashboard-welcome"
 
@@ -35,7 +34,7 @@ export default async function DashboardPage() {
       </div>
       
       {/* Dashboard Overview */}
-      <DashboardOverview user={user} />
+      <DashboardOverview user={user || null} />
     </div>
   )
 }

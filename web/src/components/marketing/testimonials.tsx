@@ -38,7 +38,7 @@ export function Testimonials() {
               Trusted by Facility Owners
             </h2>
             <p className="max-w-[900px] text-muted-foreground md:text-xl/relaxed lg:text-base/relaxed xl:text-xl/relaxed">
-              Don't just take our word for it. Here's what other pickleball facility owners have to say about our platform.
+              Don&apos;t just take our word for it. Here&apos;s what other pickleball facility owners have to say about our platform.
             </p>
           </div>
         </div>
