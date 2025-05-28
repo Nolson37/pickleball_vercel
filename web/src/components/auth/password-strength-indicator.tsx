@@ -1,10 +1,9 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { 
-  calculatePasswordStrength, 
-  getPasswordStrengthLabel, 
-  getPasswordStrengthColor,
+import {
+  calculatePasswordStrength,
+  getPasswordStrengthLabel,
   PasswordStrength,
   getValidationResults,
   PASSWORD_CRITERIA
@@ -52,8 +51,6 @@ export function PasswordStrengthIndicator({
     setResults(newResults)
   }, [password])
 
-  // Get color based on strength
-  const color = getPasswordStrengthColor(strength)
   
   // Calculate width percentage based on strength (0-4)
   const widthPercentage = ((strength + 1) / 5) * 100

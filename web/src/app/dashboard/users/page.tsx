@@ -62,15 +62,22 @@ export default async function UsersPage() {
       updatedAt: new Date(),
     }
   } else {
-    // Get the user's organization from the database
-    const userWithOrganization = await prisma.user.findUnique({
+    // Get the user's organizations from the database
+    const userWithOrganizations = await prisma.user.findUnique({
       where: { id: user.id },
       include: {
-        organization: true,
+        organizations: {
+          include: {
+            organization: true,
+          },
+        },
       },
     })
     
-    organization = userWithOrganization?.organization
+    // Get the default organization or the first one
+    const userOrg = userWithOrganizations?.organizations.find(org => org.isDefault) ||
+                    userWithOrganizations?.organizations[0]
+    organization = userOrg?.organization
   }
   
   if (!organization) {
@@ -95,8 +102,18 @@ export default async function UsersPage() {
     roles: string[];
   }
   
-  // Define User type
-  let organizationUsers: any[] = [];
+  // Define User type for database results
+  type DatabaseUser = {
+    id: string;
+    name: string | null;
+    email: string;
+    imageUrl: string | null;
+    organizations: {
+      roles: string[];
+    }[];
+  }
+  
+  let organizationUsers: DatabaseUser[] = [];
   let users: OrganizationUser[] = [];
   
   // For development mode with mock user, create mock organization users
@@ -155,7 +172,7 @@ export default async function UsersPage() {
       orderBy: {
         name: "asc"
       }
-    }) as any[];
+    }) as DatabaseUser[];
     
     // Transform the data to a more usable format
     users = organizationUsers.map(user => ({

@@ -1,6 +1,5 @@
 "use client"
 
-import { useState } from "react"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 
@@ -21,7 +20,7 @@ export function WelcomeMessage({ userName, organizationName, onDismiss }: Welcom
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
-          <h3 className="text-lg font-medium">Here's what you can do next:</h3>
+          <h3 className="text-lg font-medium">Here&apos;s what you can do next:</h3>
           <ul className="ml-6 list-disc space-y-2">
             <li>Complete your organization profile with contact information and logo</li>
             <li>Add your facilities and courts to start managing them</li>
@@ -29,8 +28,8 @@ export function WelcomeMessage({ userName, organizationName, onDismiss }: Welcom
             <li>Explore the dashboard to see key metrics and information</li>
           </ul>
           <p className="text-sm text-muted-foreground">
-            We're excited to help you manage your pickleball facilities more efficiently. If you have any questions,
-            please don't hesitate to reach out to our support team.
+            We&apos;re excited to help you manage your pickleball facilities more efficiently. If you have any questions,
+            please don&apos;t hesitate to reach out to our support team.
           </p>
         </div>
       </CardContent>

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { signIn } from "next-auth/react"
 import { zodResolver } from "@hookform/resolvers/zod"
@@ -22,15 +22,11 @@ const signInSchema = z.object({
   password: z.string().min(1, {
     message: "Password is required.",
   }),
-  rememberMe: z.boolean().default(false),
+  rememberMe: z.boolean(),
 })
 
-// Define the form values type
-interface SignInFormValues {
-  email: string;
-  password: string;
-  rememberMe: boolean;
-}
+// Use the inferred type from the schema
+type SignInFormValues = z.infer<typeof signInSchema>
 
 // Create a client component that uses useSearchParams
 function SignInForm() {
@@ -50,7 +46,7 @@ function SignInForm() {
   
 
   const form = useForm<SignInFormValues>({
-    resolver: zodResolver(signInSchema) as any,
+    resolver: zodResolver(signInSchema),
     defaultValues: {
       email: "",
       password: "",
