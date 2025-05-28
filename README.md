@@ -29,6 +29,40 @@ This platform aims to differentiate from existing tools by being:
 - **Authentication**: Auth.js (NextAuth)
 - **Deployment**: Vercel
 
+## Environment Configuration
+
+This application requires environment variables to be configured for proper operation. We provide template files for both deployment methods:
+
+### Environment Files Overview
+
+- **`web/.env.example`** - Template for local development environment variables
+- **`.env.docker.example`** - Template for Docker deployment environment variables
+
+### Required Environment Variables
+
+| Variable | Description | Required |
+|----------|-------------|----------|
+| `DATABASE_URL` | PostgreSQL connection string | Yes |
+| `AUTH_SECRET` / `NEXTAUTH_SECRET` | Secret for authentication encryption | Yes |
+| `AUTH_URL` / `NEXTAUTH_URL` | Application URL for authentication | Yes |
+| `EMAIL_SERVER` | SMTP server configuration | Yes |
+| `EMAIL_FROM` | Email address for outgoing emails | Yes |
+| `CSRF_SECRET` | Secret for CSRF protection | Yes |
+| `NODE_ENV` | Environment mode (development/production) | Yes |
+| `POSTGRES_PASSWORD` | Database password (Docker only) | Docker only |
+
+### Generating Secure Secrets
+
+For production deployments, generate secure secrets using:
+
+```bash
+# Generate AUTH_SECRET/NEXTAUTH_SECRET
+openssl rand -base64 32
+
+# Generate CSRF_SECRET
+openssl rand -base64 32
+```
+
 ## Getting Started
 
 You can run this application either with Docker (recommended) or with a local development setup.
@@ -48,14 +82,26 @@ You can run this application either with Docker (recommended) or with a local de
    cd pickleball-business-management
    ```
 
-2. Start the application:
+2. Set up environment variables for Docker:
+   ```bash
+   # Copy the Docker environment template
+   cp .env.docker.example .env.docker
+   ```
+   
+   **Important**: Edit `.env.docker` to update the following:
+   - `POSTGRES_PASSWORD`: Change to a secure password
+   - `AUTH_SECRET`: Generate with `openssl rand -base64 32`
+   - `CSRF_SECRET`: Generate with `openssl rand -base64 32`
+   - `EMAIL_SERVER` and `EMAIL_FROM`: Configure with your SMTP provider
+   - `DATABASE_URL`: Update password to match your `POSTGRES_PASSWORD`
+
+3. Start the application:
    ```bash
    ./docker-start.sh
    ```
 
-   Or manually from the web directory:
+   Or manually:
    ```bash
-   cd web
    docker compose up --build
    ```
 
@@ -130,14 +176,28 @@ docker compose restart app
    npm install
    ```
 
-3. Set up environment variables:
-   Create a `.env.local` file in the `web` directory with the following variables:
+3. Set up environment variables for local development:
+   ```bash
+   cd web
+   # Copy the local development environment template
+   cp .env.example .env.local
    ```
+   
+   **Important**: Edit `web/.env.local` to configure:
+   - `DATABASE_URL`: Your local PostgreSQL connection string
+   - `NEXTAUTH_SECRET`: Generate with `openssl rand -base64 32`
+   - `CSRF_SECRET`: Generate with `openssl rand -base64 32`
+   - `EMAIL_SERVER` and `EMAIL_FROM`: Configure with your SMTP provider
+   
+   Example `.env.local` for local development:
+   ```bash
    DATABASE_URL="postgresql://username:password@localhost:5432/pickleball"
    NEXTAUTH_URL="http://localhost:3000"
-   NEXTAUTH_SECRET="your-secret-key"
+   NEXTAUTH_SECRET="generated-secret-from-openssl-command"
    EMAIL_SERVER="smtp://username:password@smtp.example.com:587"
    EMAIL_FROM="noreply@example.com"
+   CSRF_SECRET="generated-csrf-secret-from-openssl-command"
+   NODE_ENV="development"
    ```
 
 4. Initialize the database:
