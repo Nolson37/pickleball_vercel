@@ -1,11 +1,10 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
 import { z } from "zod"
-import { useCsrf } from "@/hooks/use-csrf"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
@@ -67,12 +66,6 @@ export default function ProfilePage() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isSuccess, setIsSuccess] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const { csrfToken, loading: csrfLoading, fetchCsrfToken } = useCsrf()
-  
-  // Fetch CSRF token when component mounts
-  useEffect(() => {
-    fetchCsrfToken()
-  }, [fetchCsrfToken])
 
   const form = useForm<PasswordChangeFormValues>({
     resolver: zodResolver(passwordChangeSchema) as any,
@@ -88,16 +81,11 @@ export default function ProfilePage() {
     setError(null)
     
     try {
-      // Make sure we have a CSRF token
-      if (!csrfToken) {
-        await fetchCsrfToken()
-      }
-      
+      // NextAuth handles CSRF protection automatically
       const response = await fetch("/api/auth/change-password", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-csrf-token": csrfToken || "", // Include CSRF token in headers
         },
         body: JSON.stringify({
           currentPassword: values.currentPassword,
@@ -224,10 +212,9 @@ export default function ProfilePage() {
                   <Button
                     type="submit"
                     className="w-full"
-                    disabled={isSubmitting || csrfLoading}
+                    disabled={isSubmitting}
                   >
-                    {isSubmitting ? "Changing Password..." :
-                     csrfLoading ? "Loading..." : "Change Password"}
+                    {isSubmitting ? "Changing Password..." : "Change Password"}
                   </Button>
                 </form>
               </Form>

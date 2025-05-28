@@ -23,7 +23,6 @@ const credentialsSchema = z.object({
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   secret: process.env.AUTH_SECRET,
-  trustHost: true, // Trust the host header for CSRF protection
   adapter: PrismaAdapter(prisma),
   session: {
     strategy: "jwt",
