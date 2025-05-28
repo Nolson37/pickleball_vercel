@@ -484,3 +484,69 @@ Diagnosing CSRF authentication issues in the pickleball platform:
 - ❌ User registration system requires separate investigation (new users not persisting to database)
 
 **LESSON LEARNED**: NextAuth.js v5 requires both correct environment variable names AND proper AUTH_URL configuration in Docker containers for host trust validation.
+
+[2025-05-28 13:37:52] - **Branch Switch to Main**
+- Successfully switched from `feature/docker-containerization` to `main` branch
+- Main branch is up to date with origin/main
+- Two files have uncommitted changes carried over from previous branch:
+  - `web/next.config.ts` (modified)
+  - `web/src/app/dashboard/users/page.tsx` (modified)
+- Working directory is now `/Users/nathaniel/Desktop/Projects/pickleball_vercel`
+
+[2025-05-28 13:39:14] - **Changes Discarded**
+- Successfully discarded uncommitted changes from previous branch:
+  - `web/next.config.ts` - restored to main branch version
+  - `web/src/app/dashboard/users/page.tsx` - restored to main branch version
+- Working directory is now clean except for memory-bank updates
+- Currently on clean `main` branch, up to date with origin/main
+
+[2025-05-28 13:42:05] - **Environment Configuration Setup Complete**
+- Created comprehensive `.env.example` file in `web/` directory
+- Documented all required environment variables:
+  - Database configuration (DATABASE_URL, POSTGRES_*)
+  - Authentication (NEXTAUTH_*/AUTH_* secrets)
+  - Email server configuration
+  - Security secrets (CSRF_SECRET)
+  - Environment indicators (NODE_ENV, NEXT_PUBLIC_APP_ENV)
+- Updated `web/.gitignore` to track `.env.example` while ignoring actual env files
+- Committed changes to main branch (commit: 484dec9)
+- Branch is now ahead of origin/main by 1 commit
+- `.env.example` file includes detailed setup instructions and security recommendations
+
+[2025-05-28 13:45:35] - **Comprehensive Environment Configuration Completed**
+- Created comprehensive environment setup covering both local and Docker deployments
+- **Files created/modified:**
+  - `.env.docker.example`: Complete Docker environment template with detailed instructions
+  - `docker-compose.yml`: Updated to use `.env.docker` file instead of hardcoded values
+  - `README.md`: Enhanced with detailed environment setup section and variable reference table
+  - `.gitignore`: Updated to track environment templates while ignoring actual env files
+  - `web/.env.example`: Already existed for local development
+- **Key improvements:**
+  - Clear separation between local development and Docker deployment configs
+  - Step-by-step setup instructions for both deployment methods
+  - Security recommendations for secret generation
+  - Environment variables overview table
+  - Docker environment properly configured to use external env file
+- Committed as fd41942 - now 2 commits ahead of origin/main
+- Addresses user concern about Docker environment setup for new developers
+
+[2025-05-28 13:48:28] - **Real Secrets Generated for Docker Environment**
+- Generated secure secrets for `.env.docker` using OpenSSL:
+  - `POSTGRES_PASSWORD`: cDZfsWu1lHHhF17bEooGAcvwEdnIEaJa (24 bytes base64)
+  - `AUTH_SECRET`: 6Ib9mUZ3Gv4JC9B6p8Utinfxs/fXEL0lvq3WbENQiiA= (32 bytes base64)
+  - `CSRF_SECRET`: CdH7gyOdQdRzHAPm6CEF3H1g7RhkTBrmALoerdvACYQ= (32 bytes base64)
+- Updated `DATABASE_URL` to match the generated PostgreSQL password
+- Confirmed `.gitignore` is working correctly - `.env.docker` with real secrets not staged for commit
+- Docker environment now ready for production use with secure secrets
+- Users can immediately run `docker compose up --build` without additional secret generation
+
+[2025-05-28 13:51:04] - **Environment Configuration Tasks Completed**
+- **Task 1**: Added quotes around secrets in `.env.docker` for proper parsing
+  - All sensitive values now properly quoted (DATABASE_URL, AUTH_SECRET, CSRF_SECRET, etc.)
+  - Ensures special characters in secrets don't cause parsing issues
+- **Task 2**: Verified git tracking of environment example files
+  - `.env.docker.example` - tracked and committed (commit fd41942)
+  - `web/.env.example` - tracked and committed (commit 484dec9)
+  - Both files will be available to developers when they clone the repository
+  - No uncommitted changes to example files detected
+- Environment setup is now production-ready with proper quoting and full git tracking
