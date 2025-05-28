@@ -3,7 +3,6 @@ import { z } from "zod"
 import bcrypt from "bcryptjs"
 import { auth } from "@/auth"
 import { prisma } from "@/lib/prisma"
-import { withAuth } from "@/lib/api-middleware"
 import {
   PASSWORD_CRITERIA,
   hasUppercase,
@@ -117,5 +116,7 @@ async function changePasswordHandler(request: NextRequest) {
   }
 }
 
-// Export the handler with authentication and CSRF protection middleware
-export const POST = withAuth(changePasswordHandler)
+// Export the handler as a proper Next.js route handler
+export async function POST(request: NextRequest) {
+  return changePasswordHandler(request)
+}

@@ -4,7 +4,6 @@ import { auth } from "@/auth"
 import { prisma } from "@/lib/prisma"
 import { getPermissionUtils } from "@/lib/auth-utils"
 import { PERMISSIONS } from "@/lib/rbac"
-import { PermissionGate } from "@/components/auth/permission-gate"
 
 export const metadata: Metadata = {
   title: "Organization Settings",
@@ -66,15 +65,22 @@ export default async function OrganizationSettingsPage() {
       updatedAt: new Date(),
     }
   } else {
-    // Get the user's organization from the database
-    const userWithOrganization = await prisma.user.findUnique({
+    // Get the user's organizations from the database
+    const userWithOrganizations = await prisma.user.findUnique({
       where: { id: user.id },
       include: {
-        organization: true,
+        organizations: {
+          include: {
+            organization: true,
+          },
+        },
       },
     })
     
-    organization = userWithOrganization?.organization
+    // Get the default organization or the first one
+    const userOrg = userWithOrganizations?.organizations.find(org => org.isDefault) ||
+                    userWithOrganizations?.organizations[0]
+    organization = userOrg?.organization
   }
   
   if (!organization) {
@@ -125,21 +131,33 @@ export default async function OrganizationSettingsPage() {
       }
     ];
   } else {
-    // Get organization members from the database
-    organizationMembers = await prisma.user.findMany({
+    // Get organization members from the database through UserOrganization
+    const userOrganizations = await prisma.userOrganization.findMany({
       where: {
         organizationId: organization.id,
       },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        role: true,
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
       },
       orderBy: {
-        name: "asc",
+        user: {
+          name: "asc",
+        },
       },
-    }) as OrganizationMember[];
+    })
+    
+    organizationMembers = userOrganizations.map(userOrg => ({
+      id: userOrg.user.id,
+      name: userOrg.user.name,
+      email: userOrg.user.email,
+      role: userOrg.roles.join(', ') || 'MEMBER',
+    }));
   }
   
   return (
@@ -234,7 +252,7 @@ export default async function OrganizationSettingsPage() {
           {((process.env.NODE_ENV === 'development' && user.id === 'dev-user-id') ||
             permissions.can(PERMISSIONS.ORG_MANAGE_MEMBERS)) ? (
             <p>
-              You can invite new members and manage existing members' roles.
+              You can invite new members and manage existing members&apos; roles.
               Full member management functionality will be available in a future update.
             </p>
           ) : (

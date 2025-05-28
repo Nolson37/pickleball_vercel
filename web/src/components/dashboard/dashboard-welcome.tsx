@@ -11,7 +11,7 @@ interface DashboardWelcomeProps {
 
 export function DashboardWelcome({ userName, organizationName }: DashboardWelcomeProps) {
   const [isVisible, setIsVisible] = useState(true)
-  const { completeOnboarding, isCompleting, error } = useOnboarding()
+  const { completeOnboarding, error } = useOnboarding()
   
   const handleDismiss = async () => {
     const success = await completeOnboarding()

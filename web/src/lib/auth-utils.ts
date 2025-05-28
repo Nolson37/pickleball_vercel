@@ -114,15 +114,23 @@ export async function requireRole(role: Role): Promise<void> {
   }
 }
 
+// Type definitions for handler functions
+type AsyncHandler<T extends unknown[], R> = (...args: T) => Promise<R>
+type SyncHandler<T extends unknown[], R> = (...args: T) => R
+type Handler<T extends unknown[], R> = AsyncHandler<T, R> | SyncHandler<T, R>
+
 /**
  * Middleware-style function to check permissions
- * 
+ *
  * @param handler - Request handler function
  * @param permission - Permission to check
  * @returns Handler function that checks permission before executing the original handler
  */
-export function withPermission(handler: Function, permission: Permission) {
-  return async (...args: any[]) => {
+export function withPermission<T extends unknown[], R>(
+  handler: Handler<T, R>,
+  permission: Permission
+): AsyncHandler<T, R> {
+  return async (...args: T): Promise<R> => {
     await requirePermission(permission)
     return handler(...args)
   }
@@ -130,13 +138,16 @@ export function withPermission(handler: Function, permission: Permission) {
 
 /**
  * Middleware-style function to check roles
- * 
+ *
  * @param handler - Request handler function
  * @param role - Role to check
  * @returns Handler function that checks role before executing the original handler
  */
-export function withRole(handler: Function, role: Role) {
-  return async (...args: any[]) => {
+export function withRole<T extends unknown[], R>(
+  handler: Handler<T, R>,
+  role: Role
+): AsyncHandler<T, R> {
+  return async (...args: T): Promise<R> => {
     await requireRole(role)
     return handler(...args)
   }

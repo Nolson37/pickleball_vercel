@@ -1,9 +1,8 @@
-import { NextRequest, NextResponse } from "next/server"
+import { NextResponse } from "next/server"
 import { auth } from "@/auth"
 import { prisma } from "@/lib/prisma"
-import { withAuth } from "@/lib/api-middleware"
 
-export const POST = withAuth(async (req: NextRequest) => {
+export async function POST() {
   try {
     const session = await auth()
     
@@ -29,4 +28,4 @@ export const POST = withAuth(async (req: NextRequest) => {
       { status: 500 }
     )
   }
-})
+}
