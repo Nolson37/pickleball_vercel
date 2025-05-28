@@ -6,6 +6,7 @@ import { signIn } from "next-auth/react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
 import { z } from "zod"
+import { trace, SpanStatusCode } from "@opentelemetry/api"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
@@ -13,6 +14,9 @@ import { Input } from "@/components/ui/input"
 import { Checkbox } from "@/components/ui/checkbox"
 import Link from "next/link"
 import { Suspense } from "react"
+
+// Get tracer for signin flow
+const tracer = trace.getTracer('signin-flow', '1.0.0')
 
 // Define validation schema for sign-in
 const signInSchema = z.object({
@@ -58,27 +62,68 @@ function SignInForm() {
     setIsSubmitting(true)
     setAuthError(null)
     
-    try {
-      const result = await signIn("credentials", {
-        email: values.email,
-        password: values.password,
-        remember: values.rememberMe,
-        redirect: false,
-      })
-      
-      if (result?.error) {
-        setAuthError(result.error === "CredentialsSignin"
-          ? "Invalid email or password"
-          : result.error)
+    // Create a span for the signin attempt
+    return tracer.startActiveSpan('signin-attempt', async (span) => {
+      try {
+        // Add span attributes for context
+        span.setAttributes({
+          'user.email': values.email,
+          'auth.remember_me': values.rememberMe,
+          'auth.callback_url': callbackUrl,
+        })
+        
+        const result = await signIn("credentials", {
+          email: values.email,
+          password: values.password,
+          remember: values.rememberMe,
+          redirect: false,
+        })
+        
+        if (result?.error) {
+          // Record authentication failure
+          span.recordException(new Error(`Authentication failed: ${result.error}`))
+          span.setStatus({
+            code: SpanStatusCode.ERROR,
+            message: `Authentication failed: ${result.error}`
+          })
+          span.setAttributes({
+            'auth.success': false,
+            'auth.error': result.error,
+          })
+          
+          setAuthError(result.error === "CredentialsSignin"
+            ? "Invalid email or password"
+            : result.error)
+          setIsSubmitting(false)
+        } else if (result?.ok) {
+          // Record successful authentication
+          span.setAttributes({
+            'auth.success': true,
+            'auth.redirect_to': callbackUrl,
+          })
+          span.setStatus({ code: SpanStatusCode.OK })
+          
+          router.push(callbackUrl)
+        }
+      } catch (error) {
+        // Record and trace the exception
+        span.recordException(error as Error)
+        span.setStatus({
+          code: SpanStatusCode.ERROR,
+          message: (error as Error).message
+        })
+        span.setAttributes({
+          'auth.success': false,
+          'error.type': 'unexpected_error',
+        })
+        
+        console.error("Sign-in error:", error)
+        setAuthError("An unexpected error occurred. Please try again.")
         setIsSubmitting(false)
-      } else if (result?.ok) {
-        router.push(callbackUrl)
+      } finally {
+        span.end()
       }
-    } catch (error) {
-      console.error("Sign-in error:", error)
-      setAuthError("An unexpected error occurred. Please try again.")
-      setIsSubmitting(false)
-    }
+    })
   }
 
   return (
