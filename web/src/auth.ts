@@ -72,27 +72,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   },
   callbacks: {
     async jwt({ token, user }) {
-      // Add organization context to the token if available
+      // Add basic user context to the token
       if (user) {
         token.userId = user.id
-        
-        // Get the user's default organization
-        const userOrg = await prisma.userOrganization.findFirst({
-          where: {
-            userId: user.id,
-            isDefault: true,
-          },
-          include: {
-            organization: true,
-          },
-        })
-        
-        if (userOrg) {
-          token.organizationId = userOrg.organizationId
-          token.organizationName = userOrg.organization.name
-          token.organizationSlug = userOrg.organization.slug
-          token.roles = userOrg.roles
-        }
+        // Note: Organization context will be loaded in session callback or on pages
+        // that need it, since JWT callback runs in Edge Runtime which doesn't support Prisma
       }
       
       console.log("JWT Callback Token:", token);

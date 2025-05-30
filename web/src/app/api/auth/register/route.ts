@@ -79,9 +79,9 @@ async function sendVerificationEmail(email: string, token: string) {
     },
   })
 
-  // Verification URL
+  // Verification URL - point directly to API endpoint
   const baseUrl = process.env.NEXTAUTH_URL || "http://localhost:3000"
-  const verificationUrl = `${baseUrl}/auth/verify?token=${token}`
+  const verificationUrl = `${baseUrl}/api/auth/verify?token=${token}`
 
   // Email content
   const mailOptions = {

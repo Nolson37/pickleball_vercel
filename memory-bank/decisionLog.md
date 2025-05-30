@@ -322,3 +322,21 @@ Defined six core roles for the incident response team (Incident Commander, Techn
 Created six distinct incident type playbooks (Application Outages, Database Issues, Performance Degradation, Security Incidents, Data Integrity Issues, Third-Party Service Disruptions) to address the most common and critical incident scenarios for the application.
 
 Incorporated decision trees into each playbook to guide the response team through complex scenarios, ensuring consistent decision-making during high-pressure situations.
+
+[2025-05-29 13:50:53] - ## [2025-05-29] File Structure Analysis - README.md and package.json Duplication
+
+**Issue**: User questioned whether duplicate README.md and package.json files in root vs web/ directory were normal or should be consolidated.
+
+**Analysis**: After comprehensive examination of both file pairs:
+- Root level serves as project orchestration layer (Docker, global dependencies, project-wide docs)
+- web/ directory serves as application implementation layer (Next.js app, dev tooling, app-specific docs) 
+
+**Decision**: KEEP current structure - this is architecturally appropriate
+- Root package.json: Global dependencies (@vercel/analytics, @vercel/speed-insights)
+- Web package.json: Complete Next.js application dependencies (29 prod + 27 dev deps)
+- Root README.md: Project-wide documentation, Docker deployment focus
+- Web README.md: Application-specific documentation, development focus
+
+**Rationale**: This follows modern monorepo patterns with clear separation of concerns. Structure supports multiple deployment methods and future expansion.
+
+**Outcome**: No changes needed - structure is intentional and well-designed.

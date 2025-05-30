@@ -10,8 +10,17 @@ const globalForPrisma = global as unknown as { prisma: PrismaClient }
 // Create database tracer
 const tracer = trace.getTracer('database', '1.0.0')
 
+// Interface for Prisma middleware parameters
+interface PrismaParams {
+  model?: string
+  action?: string
+  args?: unknown
+  dataPath?: string[]
+  runInTransaction?: boolean
+}
+
 // Helper function to extract operation details from Prisma params
-function extractOperationDetails(params: any) {
+function extractOperationDetails(params: PrismaParams) {
   const model = params.model || 'unknown'
   const action = params.action || 'unknown'
   const table = model.toLowerCase()
@@ -62,7 +71,6 @@ prisma.$use(async (params, next) => {
 
   const startTime = Date.now()
   let affectedRows = 0
-  let success = true
 
   try {
     // Execute the query
@@ -89,7 +97,6 @@ prisma.$use(async (params, next) => {
     span.setStatus({ code: SpanStatusCode.OK })
     return result
   } catch (error) {
-    success = false
     
     // Record the exception and set error status
     span.recordException(error as Error)
