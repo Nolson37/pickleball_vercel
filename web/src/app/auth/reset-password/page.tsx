@@ -1,10 +1,11 @@
 "use client"
 
-import { useState, Suspense } from "react"
+import { useState, Suspense, useEffect } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
 import { z } from "zod"
+import { trace, SpanStatusCode } from "@opentelemetry/api"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
@@ -18,6 +19,9 @@ import {
   hasNumber,
   hasSpecialChar
 } from "@/lib/password-validation"
+
+// Get tracer for auth pages
+const tracer = trace.getTracer('page-auth', '1.0.0')
 
 // Password validation schema
 const passwordSchema = z.string()
@@ -71,6 +75,35 @@ function ResetPasswordForm() {
     },
   })
 
+  // Trace page load
+  useEffect(() => {
+    tracer.startActiveSpan('page-reset-password', (span) => {
+      span.setAttributes({
+        'page.route': '/auth/reset-password',
+        'page.title': 'Reset Password',
+        'user.authenticated': false,
+        'page.type': 'auth',
+        'reset_token.present': !!token,
+        'url.search_params': searchParams.toString()
+      })
+      
+      if (!token) {
+        span.setAttributes({
+          'reset_token.error': 'missing_token',
+          'error.type': 'validation_error'
+        })
+        span.setStatus({
+          code: SpanStatusCode.ERROR,
+          message: 'Reset token is missing'
+        })
+      } else {
+        span.setStatus({ code: SpanStatusCode.OK })
+      }
+      
+      span.end()
+    })
+  }, [token, searchParams])
+
   async function onSubmit(values: ResetPasswordFormValues) {
     if (!token) {
       setError("Reset token is missing. Please use the link from the email.")
@@ -80,36 +113,95 @@ function ResetPasswordForm() {
     setIsSubmitting(true)
     setError(null)
     
-    try {
-      const response = await fetch("/api/auth/reset-password", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          token,
-          password: values.password,
-        }),
-      })
-      
-      const data = await response.json()
-      
-      if (!response.ok) {
-        throw new Error(data.error || "Failed to reset password")
+    // Create a span for the password reset attempt
+    return tracer.startActiveSpan('reset-password-attempt', async (span) => {
+      try {
+        // Add span attributes for context
+        span.setAttributes({
+          'form.type': 'reset_password',
+          'operation.type': 'password_reset',
+          'reset_token.present': !!token,
+          'form.validation.success': true
+        })
+        
+        const response = await fetch("/api/auth/reset-password", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            token,
+            password: values.password,
+          }),
+        })
+        
+        const data = await response.json()
+        
+        if (!response.ok) {
+          // Record API failure
+          const errorMessage = data.error || "Failed to reset password"
+          span.recordException(new Error(`API request failed: ${errorMessage}`))
+          span.setStatus({
+            code: SpanStatusCode.ERROR,
+            message: errorMessage
+          })
+          span.setAttributes({
+            'form.submission.success': false,
+            'api.response.status': response.status,
+            'error.type': 'api_failure',
+            'error.message': errorMessage,
+            'reset_token.valid': false
+          })
+          
+          throw new Error(errorMessage)
+        }
+        
+        // Record successful password reset
+        span.setAttributes({
+          'form.submission.success': true,
+          'api.response.status': response.status,
+          'password.reset_success': true,
+          'user.action': 'password_reset_completed',
+          'navigation.target': '/auth/signin'
+        })
+        span.setStatus({ code: SpanStatusCode.OK })
+        
+        setIsSuccess(true)
+        
+        // Redirect to sign in page after 3 seconds
+        setTimeout(() => {
+          tracer.startActiveSpan('navigation-redirect', (navSpan) => {
+            navSpan.setAttributes({
+              'navigation.source': '/auth/reset-password',
+              'navigation.target': '/auth/signin',
+              'navigation.trigger': 'auto_redirect',
+              'navigation.delay_ms': 3000
+            })
+            navSpan.setStatus({ code: SpanStatusCode.OK })
+            navSpan.end()
+            
+            router.push("/auth/signin")
+          })
+        }, 3000)
+      } catch (error) {
+        // Record and trace the exception
+        span.recordException(error as Error)
+        span.setStatus({
+          code: SpanStatusCode.ERROR,
+          message: (error as Error).message
+        })
+        span.setAttributes({
+          'form.submission.success': false,
+          'error.type': 'unexpected_error',
+        })
+        
+        console.error("Reset password error:", error)
+        setError(error instanceof Error ? error.message : "An unexpected error occurred")
+      } finally {
+        setIsSubmitting(false)
+        span.end()
       }
-      
-      setIsSuccess(true)
-      
-      // Redirect to sign in page after 3 seconds
-      setTimeout(() => {
-        router.push("/auth/signin")
-      }, 3000)
-    } catch (error) {
-      console.error("Reset password error:", error)
-      setError(error instanceof Error ? error.message : "An unexpected error occurred")
-    } finally {
-      setIsSubmitting(false)
-    }
+    })
   }
 
   // If no token is provided, show an error

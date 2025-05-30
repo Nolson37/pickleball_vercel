@@ -3,6 +3,7 @@ import { z } from "zod"
 import bcrypt from "bcryptjs"
 import crypto from "crypto"
 import nodemailer from "nodemailer"
+import { trace, SpanStatusCode } from "@opentelemetry/api"
 import { prisma } from "@/lib/prisma"
 import {
   PASSWORD_CRITERIA,
@@ -11,6 +12,9 @@ import {
   hasNumber,
   hasSpecialChar
 } from "@/lib/password-validation"
+
+// Get tracer for user registration flows
+const tracer = trace.getTracer('api-auth', '1.0.0')
 
 // Password validation schema
 const passwordSchema = z.string()
@@ -75,9 +79,9 @@ async function sendVerificationEmail(email: string, token: string) {
     },
   })
 
-  // Verification URL
+  // Verification URL - point directly to API endpoint
   const baseUrl = process.env.NEXTAUTH_URL || "http://localhost:3000"
-  const verificationUrl = `${baseUrl}/auth/verify?token=${token}`
+  const verificationUrl = `${baseUrl}/api/auth/verify?token=${token}`
 
   // Email content
   const mailOptions = {
@@ -114,124 +118,195 @@ async function sendVerificationEmail(email: string, token: string) {
 }
 
 export async function POST(request: NextRequest) {
-  try {
-    // Parse request body
-    const body = await request.json()
-    
-    // Validate request body
-    const { organizationName, adminName, email, password } = registrationSchema.parse(body)
-    
-    // Check if email already exists
-    const existingUser = await prisma.user.findUnique({
-      where: { email },
-    })
-    
-    if (existingUser) {
-      return NextResponse.json(
-        { error: "Email already in use" },
-        { status: 400 }
-      )
-    }
-    
-    // Create organization slug
-    const baseSlug = createSlug(organizationName)
-    
-    // Check if slug exists and generate a unique one if needed
-    let slug = baseSlug
-    let slugExists = true
-    let counter = 1
-    
-    while (slugExists) {
-      const existingOrg = await prisma.organization.findUnique({
-        where: { slug },
+  return tracer.startActiveSpan('api-register', async (span) => {
+    try {
+      // Add basic request attributes
+      span.setAttributes({
+        'http.method': 'POST',
+        'http.url': request.url,
+        'request.type': 'user_registration',
+        'operation.name': 'register_user_and_organization'
       })
       
-      if (!existingOrg) {
-        slugExists = false
-      } else {
-        slug = `${baseSlug}-${counter}`
-        counter++
+      // Parse request body
+      const body = await request.json()
+      
+      // Validate request body
+      const { organizationName, adminName, email, password } = registrationSchema.parse(body)
+      
+      // Add user and organization context to span
+      span.setAttributes({
+        'user.email': email,
+        'user.name': adminName,
+        'organization.name': organizationName
+      })
+      
+      // Check if email already exists
+      const existingUser = await prisma.user.findUnique({
+        where: { email },
+      })
+      
+      if (existingUser) {
+        span.setAttributes({
+          'registration.success': false,
+          'registration.failure_reason': 'email_already_exists',
+          'http.status_code': 400
+        })
+        span.setStatus({ code: SpanStatusCode.ERROR, message: 'Email already in use' })
+        
+        return NextResponse.json(
+          { error: "Email already in use" },
+          { status: 400 }
+        )
       }
-    }
-    
-    // Hash password
-    const saltRounds = 10
-    const passwordHash = await bcrypt.hash(password, saltRounds)
-    
-    // Generate verification token
-    const verificationToken = crypto.randomBytes(32).toString("hex")
-    const tokenExpiry = new Date()
-    tokenExpiry.setHours(tokenExpiry.getHours() + 24) // Token expires in 24 hours
-    
-    // Create user, organization, and user-organization relationship in a transaction
-    const result = await prisma.$transaction(async (tx) => {
-      // Create organization
-      const organization = await tx.organization.create({
-        data: {
-          name: organizationName,
-          slug,
-        },
+      
+      // Create organization slug
+      const baseSlug = createSlug(organizationName)
+      
+      // Check if slug exists and generate a unique one if needed
+      let slug = baseSlug
+      let slugExists = true
+      let counter = 1
+      
+      while (slugExists) {
+        const existingOrg = await prisma.organization.findUnique({
+          where: { slug },
+        })
+        
+        if (!existingOrg) {
+          slugExists = false
+        } else {
+          slug = `${baseSlug}-${counter}`
+          counter++
+        }
+      }
+      
+      // Add final slug to span
+      span.setAttributes({
+        'organization.slug': slug,
+        'organization.slug_attempts': counter
       })
       
-      // Create user
-      const user = await tx.user.create({
-        data: {
-          email,
-          name: adminName,
-          passwordHash,
-        },
+      // Hash password
+      const saltRounds = 10
+      const passwordHash = await bcrypt.hash(password, saltRounds)
+      
+      // Generate verification token
+      const verificationToken = crypto.randomBytes(32).toString("hex")
+      const tokenExpiry = new Date()
+      tokenExpiry.setHours(tokenExpiry.getHours() + 24) // Token expires in 24 hours
+      
+      // Create user, organization, and user-organization relationship in a transaction
+      const result = await prisma.$transaction(async (tx) => {
+        // Create organization
+        const organization = await tx.organization.create({
+          data: {
+            name: organizationName,
+            slug,
+          },
+        })
+        
+        // Create user
+        const user = await tx.user.create({
+          data: {
+            email,
+            name: adminName,
+            passwordHash,
+          },
+        })
+        
+        // Create user-organization relationship with admin role
+        const userOrganization = await tx.userOrganization.create({
+          data: {
+            userId: user.id,
+            organizationId: organization.id,
+            roles: ["admin"],
+            isDefault: true,
+          },
+        })
+        
+        // Create verification token
+        const verificationRecord = await tx.verificationToken.create({
+          data: {
+            email,
+            token: verificationToken,
+            expires: tokenExpiry,
+          },
+        })
+        
+        return { user, organization, userOrganization, verificationRecord }
       })
       
-      // Create user-organization relationship with admin role
-      const userOrganization = await tx.userOrganization.create({
-        data: {
-          userId: user.id,
-          organizationId: organization.id,
-          roles: ["admin"],
-          isDefault: true,
-        },
+      // Add successful creation attributes
+      span.setAttributes({
+        'user.id': result.user.id,
+        'organization.id': result.organization.id,
+        'database.transaction_success': true,
+        'verification.token_created': true
       })
       
-      // Create verification token
-      const verificationRecord = await tx.verificationToken.create({
-        data: {
-          email,
-          token: verificationToken,
-          expires: tokenExpiry,
-        },
-      })
+      // Send verification email
+      await sendVerificationEmail(result.user.email, result.verificationRecord.token)
       
-      return { user, organization, userOrganization, verificationRecord }
-    })
-    
-    // Send verification email
-    await sendVerificationEmail(result.user.email, result.verificationRecord.token)
-    
-    // Return success response
-    return NextResponse.json(
-      {
-        success: true,
-        message: "Registration successful. Please check your email to verify your account.",
-        organizationId: result.organization.id,
-        organizationSlug: result.organization.slug,
-      },
-      { status: 201 }
-    )
-  } catch (error) {
-    console.error("Registration error:", error)
-    
-    // Handle validation errors
-    if (error instanceof z.ZodError) {
+      // Add email sending success
+      span.setAttributes({
+        'email.verification_sent': true,
+        'registration.success': true,
+        'http.status_code': 201
+      })
+      span.setStatus({ code: SpanStatusCode.OK })
+      
+      // Return success response
       return NextResponse.json(
-        { error: "Validation error", details: error.errors },
-        { status: 400 }
+        {
+          success: true,
+          message: "Registration successful. Please check your email to verify your account.",
+          organizationId: result.organization.id,
+          organizationSlug: result.organization.slug,
+        },
+        { status: 201 }
       )
+    } catch (error) {
+      console.error("Registration error:", error)
+      
+      // Record and trace the exception
+      span.recordException(error as Error)
+      span.setAttributes({
+        'registration.success': false,
+        'error.type': error instanceof z.ZodError ? 'validation_error' : 'registration_error'
+      })
+      
+      // Handle validation errors
+      if (error instanceof z.ZodError) {
+        span.setAttributes({
+          'registration.failure_reason': 'validation_error',
+          'validation.errors': JSON.stringify(error.errors),
+          'http.status_code': 400
+        })
+        span.setStatus({ code: SpanStatusCode.ERROR, message: 'Validation error' })
+        
+        return NextResponse.json(
+          { error: "Validation error", details: error.errors },
+          { status: 400 }
+        )
+      }
+      
+      // Handle other errors
+      span.setAttributes({
+        'registration.failure_reason': 'internal_error',
+        'http.status_code': 500
+      })
+      span.setStatus({
+        code: SpanStatusCode.ERROR,
+        message: (error as Error).message
+      })
+      
+      return NextResponse.json(
+        { error: "Registration failed. Please try again." },
+        { status: 500 }
+      )
+    } finally {
+      span.end()
     }
-    
-    // Handle other errors
-    return NextResponse.json(
-      { error: "Registration failed. Please try again." },
-      { status: 500 }
-    )
-  }
+  })
 }

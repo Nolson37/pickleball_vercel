@@ -1,8 +1,44 @@
+"use client"
+
+import { useEffect } from "react"
 import Link from "next/link"
+import { trace, SpanStatusCode } from "@opentelemetry/api"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 
+// Get tracer for auth pages
+const tracer = trace.getTracer('page-auth', '1.0.0')
+
 export default function VerificationSuccessPage() {
+  // Trace page load
+  useEffect(() => {
+    tracer.startActiveSpan('page-verification-success', (span) => {
+      span.setAttributes({
+        'page.route': '/auth/verification-success',
+        'page.title': 'Email Verification Success',
+        'user.authenticated': false,
+        'page.type': 'auth',
+        'verification.status': 'success',
+        'user.email_verified': true
+      })
+      span.setStatus({ code: SpanStatusCode.OK })
+      span.end()
+    })
+  }, [])
+
+  // Handle navigation to signin
+  const handleProceedToLogin = () => {
+    tracer.startActiveSpan('navigation-proceed-to-login', (span) => {
+      span.setAttributes({
+        'navigation.source': '/auth/verification-success',
+        'navigation.target': '/auth/signin',
+        'navigation.trigger': 'user_click',
+        'user.action': 'proceed_to_login'
+      })
+      span.setStatus({ code: SpanStatusCode.OK })
+      span.end()
+    })
+  }
   return (
     <div className="container flex items-center justify-center min-h-screen py-12">
       <Card className="w-full max-w-md border-2 border-primary">
@@ -30,7 +66,7 @@ export default function VerificationSuccessPage() {
           </svg>
         </CardContent>
         <CardFooter>
-          <Button className="w-full" asChild>
+          <Button className="w-full" asChild onClick={handleProceedToLogin}>
             <Link href="/auth/signin">Proceed to Login</Link>
           </Button>
         </CardFooter>
